@@ -1,19 +1,22 @@
 # Project Roadmap
 
-This is a plan, not implemented functionality. Only Phase 0 scaffolding is present;
-final contract agreement and branch protection still need the team's review.
+This is a plan, not implemented functionality. Phase 0 now includes finalized
+contracts, schema design and a buildable shared package. Review the
+[readiness checklist](PHASE_0_CHECKLIST.md); hosted branch protection remains a
+manual repository setting. Use [parallel delivery waves](PARALLEL_DEVELOPMENT.md)
+to begin auth UI during database implementation.
 
 ## Phase 0: Repository + Architecture + Contracts
 
 - Marouane tasks: review frontend folders, placeholder boot and API/socket boundaries.
 - Oussama tasks: review backend folders, configuration and raw SQL ownership.
-- Shared integration task: approve contracts, workflow and branch protection.
+- Shared integration task: review Phase 0, verify builds and configure branch protection.
 
 ## Phase 1: Database Foundation
 
-- Marouane tasks: identify data needed by planned screens and review public fields.
-- Oussama tasks: design PostgreSQL schema, constraints, migrations and connection setup.
-- Shared integration task: align shared IDs/types with the schema and migration workflow.
+- Marouane tasks: start feat/auth-ui with finalized contracts and typed service mocks.
+- Oussama tasks: implement the documented schema, constraints, migrations and connection setup.
+- Shared integration task: verify shared IDs/types and database constraints against the contracts.
 
 ## Phase 2: Authentication
 
@@ -31,7 +34,7 @@ final contract agreement and branch protection still need the team's review.
 
 - Marouane tasks: build GPS permission, fallback and location-editing UI.
 - Oussama tasks: implement location validation, persistence and distance support.
-- Shared integration task: agree on precision/privacy and test denied GPS permission.
+- Shared integration task: verify documented coordinate privacy and test denied GPS permission.
 
 ## Phase 5: Browsing and Matching
 

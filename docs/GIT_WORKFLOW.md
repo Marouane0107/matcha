@@ -8,7 +8,7 @@ parallel in their owned workspace; shared contracts require joint review.
 
 | Marouane: Frontend & Realtime Client | Oussama: Backend & Core |
 | --- | --- |
-| feat/auth-ui | feat/database |
+| feat/auth-ui | feat/database-foundation |
 | feat/profile-ui | feat/auth-api |
 | feat/browse-ui | feat/profile-api |
 | feat/search-ui | feat/search-api |
@@ -25,7 +25,8 @@ git pull
 git checkout -b feat/name
 ```
 
-Agree on API/socket contracts before implementing either side. Keep PRs focused;
+Use the finalized Phase 0 API/socket contracts; review changes to them before
+implementing a different contract on either side. Keep PRs focused;
 avoid unrelated formatting, dependency churn and changes to the other owner's area.
 
 ## Complete a Feature

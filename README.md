@@ -15,7 +15,8 @@ database access, matching, uploads, chat, and notifications are not implemented.
 | Marouane | Frontend & Realtime Client | React, UI/UX, responsive design, authentication screens, profile/browse/search UI, filters/sorting, image upload UI, GPS/location UI, chat/notifications UI, Socket.IO client, API integration |
 | Oussama | Backend & Core | Express, PostgreSQL, raw SQL, authentication, email verification/password reset, profiles API, matching, search/filter/sort, likes/connections, blocks/reports, upload security, location, Socket.IO server, chat persistence, notifications, seeding 500+ profiles |
 
-Both developers review changes to shared contracts before implementation.
+Phase 0 contracts are finalized for implementation. Both developers review any
+subsequent contract changes in a focused pull request.
 
 ## Tech Stack
 
@@ -37,10 +38,11 @@ Backend (Oussama)
 PostgreSQL
 ```
 
-The frontend never accesses the database directly. `shared/` contains only
-cross-workspace contracts and constants, not server logic or credentials.
-`frontend/src/services/api/` will own HTTP transport; `frontend/src/api/` will own
-typed endpoint adapters. Both are empty until contracts are agreed.
+The frontend never accesses the database directly. The `@matcha/shared` npm
+workspace contains only cross-workspace contracts and constants, not server logic
+or credentials. `frontend/src/services/api/` will own HTTP transport;
+`frontend/src/api/` will own typed endpoint adapters. Only contract exports exist
+today; there are no requests, socket connections, or feature implementations.
 
 ## Development Setup
 
@@ -70,12 +72,12 @@ change `PORT` and both frontend URLs consistently.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start both workspaces; stop both with Ctrl+C |
-| `npm run dev:frontend` | Start Vite only |
-| `npm run dev:backend` | Start Express with tsx watch mode |
-| `npm run build` | Typecheck frontend, bundle it, and compile backend/shared code |
-| `npm run typecheck` | Check both workspaces and shared contracts without emitting |
-| `npm run install:all` | Install both workspaces from the root |
+| `npm run dev` | Build shared, then watch shared and start frontend/backend; Ctrl+C stops all |
+| `npm run dev:frontend` | Build shared, then start Vite |
+| `npm run dev:backend` | Build shared, then start Express with tsx watch mode |
+| `npm run build` | Build shared first, frontend second, backend last |
+| `npm run typecheck` | Build shared declarations, then check all three workspaces |
+| `npm run install:all` | Install all three workspaces from the root |
 | `npm ci` | Reproduce the committed root lockfile |
 | `npm run start --workspace=backend` | Run the compiled backend after building |
 
@@ -85,32 +87,55 @@ checks, and add focused tests with each implemented feature.
 
 ### Shared Contracts
 
-Both TypeScript configurations include `shared/`. Use relative imports; it is not
-a third npm workspace. Examples from files directly under either `src/`:
+Use package imports everywhere in frontend/backend, never relative paths into
+shared source:
 
 ```ts
-import type { ApiResponse } from "../../shared/contracts/api.types";
-import { CLIENT_TO_SERVER_EVENTS } from "../../shared/constants/socket-events";
+import type { ApiResponse, UserProfile } from "@matcha/shared";
+import { API_ROUTES, SOCKET_EVENTS, ERROR_CODES } from "@matcha/shared";
 ```
 
-Adjust relative depth from nested files. Shared modules must stay compatible with
-browser and Node environments. Backend compilation preserves the directory layout
-under `backend/dist/`, so its entrypoint is `backend/dist/backend/src/server.js`.
-The start script already accounts for this. Interfaces are provisional, not
-runtime validators. IDs are strings and timestamps are ISO 8601 UTC strings for
-now; both developers must agree on changes before consuming them. `UserProfile`
-is owner-only; `PublicProfile` deliberately excludes email. Auth transport, final
-profile fields, notification variants, and socket payloads remain TODO.
+The shared package emits CommonJS runtime constants and TypeScript declarations
+to shared/dist. Vite explicitly handles this linked CommonJS workspace; Node uses
+its package exports directly. Root build order is shared, frontend, backend.
+Backend output now starts at backend/dist/server.js. Run root build before using
+workspace-only production scripts. The root dev command watches shared; standalone
+frontend/backend dev commands rebuild shared once, so rebuild it after contract edits.
+After changing runtime constants, restart Vite with `npm run dev --workspace=frontend
+-- --force` to invalidate its prebundled dependency cache. The shared watcher alone
+is not a guarantee that Vite's optimized dependency cache has refreshed.
+
+Interfaces are contracts, not runtime validators. IDs are UUID strings; instants
+are ISO 8601 UTC strings. UserProfile is owner-only; PublicProfile omits email,
+birth date and exact coordinates. Auth uses memory-only bearer JWTs, 15-minute
+expiry, no refresh tokens and all-device logout. See the final docs below.
+
+## Start Coding
+
+- Marouane: [frontend start guide](docs/MAROUANE_START_HERE.md), branch `feat/auth-ui`.
+- Oussama: [backend start guide](docs/OUSSAMA_BACKEND_GUIDE.md), branch
+  `feat/database-foundation`, then `feat/auth-api`.
+- Both: [parallel development](docs/PARALLEL_DEVELOPMENT.md) and the
+  [Phase 0 readiness checklist](docs/PHASE_0_CHECKLIST.md).
 
 ### Manual Configuration
 
-- Oussama: provision PostgreSQL and a least-privilege database user when Phase 1
-  starts. Fill local DB values, then agree on a migration/seed workflow.
+- Oussama: provision PostgreSQL 16+ and a least-privilege database user when Phase 1
+  starts. Fill local DB values and follow the documented migration workflow.
 - Oussama: configure a local JWT secret and email provider before implementing
   authentication. Those values are unused by the current server.
 - Marouane: keep public API/socket URLs consistent with the backend address.
-- Both: agree on contracts and configure GitHub main-branch protection requiring
+- Both: review Phase 0 and configure GitHub main-branch protection requiring
   a pull request and review from the other developer. CI is not configured yet.
+
+The frontend env template contains only VITE_API_URL and VITE_SOCKET_URL. The
+backend template defines PORT, NODE_ENV, DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD,
+JWT_SECRET, JWT_EXPIRES_IN, EMAIL_HOST/EMAIL_PORT/EMAIL_USER/EMAIL_PASSWORD and
+FRONTEND_URL. JWT_EXPIRES_IN=15m is a non-secret policy default; credential fields
+remain blank. PostgreSQL defaults to localhost:5432, database matcha. SMTP and
+startup-validation requirements are in the backend guide. VITE_API_URL includes
+/api, while route constants already contain /api: adapters resolve against its
+origin, not by concatenating two prefixes. No secret belongs in a VITE_ variable.
 
 ## Git Workflow
 
@@ -118,7 +143,7 @@ Nobody works directly on `main`. Use a small branch per feature, never permanent
 frontend/backend branches.
 
 Frontend examples: `feat/auth-ui`, `feat/profile-ui`, `feat/browse-ui`, `feat/chat-ui`.
-Backend examples: `feat/database`, `feat/auth-api`, `feat/profile-api`,
+Backend examples: `feat/database-foundation`, `feat/auth-api`, `feat/profile-api`,
 `feat/matching-api`, `feat/socket-server`.
 
 ```text
@@ -145,8 +170,9 @@ Sequelize, TypeORM, Drizzle, Mongoose, and all other ORMs are prohibited.
 
 ## Documentation
 
-- [API contract template](docs/API_CONTRACT.md)
-- [Database planning](docs/DATABASE_SCHEMA.md)
+- [Final API contract and validation](docs/API_CONTRACT.md)
+- [Auth strategy](docs/AUTH_STRATEGY.md)
+- [Final database design](docs/DATABASE_SCHEMA.md)
 - [Socket event dictionary](docs/SOCKET_EVENTS.md)
 - [Git workflow](docs/GIT_WORKFLOW.md)
 - [Project roadmap](docs/PROJECT_ROADMAP.md)
@@ -154,9 +180,9 @@ Sequelize, TypeORM, Drizzle, Mongoose, and all other ORMs are prohibited.
 
 ## Repository Tree and File Inventory
 
-All files below are foundation files. `README.md` and `.gitignore` existed before
-setup and were updated; every other listed file was added. `.gitkeep` files retain
-empty directories in Git. Generated `node_modules/` and `dist/` are omitted.
+All files below are foundation files. `.gitkeep` files retain placeholder
+directories in Git. Generated `node_modules/` and `dist/` are omitted. The final
+Phase 0 change inventory is recorded in [the checklist](docs/PHASE_0_CHECKLIST.md).
 
 ```text
 matcha/
@@ -204,6 +230,7 @@ matcha/
 |       |   `-- .gitkeep
 |       |-- services/
 |       |   |-- api/
+|       |   |   |-- contracts.ts
 |       |   |   `-- .gitkeep
 |       |   `-- socket/
 |       |       `-- .gitkeep
@@ -223,6 +250,7 @@ matcha/
 |       |-- app.ts
 |       |-- server.ts
 |       |-- config/
+|       |   |-- contracts.ts
 |       |   `-- .gitkeep
 |       |-- controllers/
 |       |   `-- .gitkeep
@@ -246,19 +274,31 @@ matcha/
 |       `-- utils/
 |           `-- .gitkeep
 |-- shared/
+|   |-- package.json
+|   |-- tsconfig.json
+|   |-- index.ts
 |   |-- contracts/
 |   |   |-- api.types.ts
 |   |   |-- auth.types.ts
 |   |   |-- profile.types.ts
+|   |   |-- search.types.ts
+|   |   |-- interaction.types.ts
 |   |   |-- chat.types.ts
 |   |   `-- notification.types.ts
 |   `-- constants/
+|       |-- api-routes.ts
+|       |-- error-codes.ts
 |       `-- socket-events.ts
 |-- docs/
 |   |-- API_CONTRACT.md
+|   |-- AUTH_STRATEGY.md
 |   |-- DATABASE_SCHEMA.md
 |   |-- SOCKET_EVENTS.md
 |   |-- GIT_WORKFLOW.md
+|   |-- MAROUANE_START_HERE.md
+|   |-- OUSSAMA_BACKEND_GUIDE.md
+|   |-- PARALLEL_DEVELOPMENT.md
+|   |-- PHASE_0_CHECKLIST.md
 |   `-- PROJECT_ROADMAP.md
 `-- scripts/
     `-- README.md

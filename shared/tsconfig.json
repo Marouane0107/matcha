@@ -4,14 +4,13 @@
     "lib": ["ES2022"],
     "module": "Node16",
     "moduleResolution": "Node16",
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "dist",
+    "declaration": true,
     "strict": true,
-    "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": ["node"]
+    "types": []
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["dist", "node_modules"]
+  "include": ["index.ts", "contracts/**/*.ts", "constants/**/*.ts"],
+  "exclude": ["dist"]
 }
