@@ -7,11 +7,11 @@ import { generateToken } from '../utils/jwt.util.js';
 export const register = async (req, res, next) => {
   try {
     const { username, email, firstName, lastName, password } = req.body;
-    
+
     if (!username || !email || !firstName || !lastName || !password) {
       return res.status(400).json({ status: 'error', message: 'All fields are required' });
     }
-    
+
     if (!isPasswordStrong(password)) {
       return res.status(400).json({ status: 'error', message: 'Password is too weak' });
     }
@@ -23,7 +23,7 @@ export const register = async (req, res, next) => {
     }
 
     const hashedPwd = await hashPassword(password);
-    
+
     // Insert user
     const insertUserQuery = `
       INSERT INTO users (username, email, password_hash)
@@ -75,16 +75,16 @@ export const verify = async (req, res, next) => {
     if (!token) return res.status(400).json({ status: 'error', message: 'Token is required' });
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    
+
     const tokenQuery = 'SELECT * FROM tokens WHERE token_hash = $1 AND type = $2';
     const tokenResult = await pool.query(tokenQuery, [tokenHash, 'verification']);
-    
+
     if (tokenResult.rows.length === 0) {
       return res.status(400).json({ status: 'error', message: 'Invalid or expired token' });
     }
 
     const tokenRecord = tokenResult.rows[0];
-    
+
     if (new Date() > new Date(tokenRecord.expires_at)) {
       await pool.query('DELETE FROM tokens WHERE id = $1', [tokenRecord.id]);
       return res.status(400).json({ status: 'error', message: 'Token has expired' });
@@ -92,7 +92,7 @@ export const verify = async (req, res, next) => {
 
     // Verify the user account
     await pool.query('UPDATE users SET is_verified = TRUE WHERE id = $1', [tokenRecord.user_id]);
-    
+
     // Consume the token
     await pool.query('DELETE FROM tokens WHERE id = $1', [tokenRecord.id]);
 
@@ -105,14 +105,14 @@ export const verify = async (req, res, next) => {
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ status: 'error', message: 'Email and password are required' });
     }
 
     const query = 'SELECT * FROM users WHERE email = $1';
     const result = await pool.query(query, [email]);
-    
+
     if (result.rows.length === 0) {
       return res.status(401).json({ status: 'error', message: 'Invalid credentials' });
     }
@@ -233,7 +233,7 @@ export const resetPassword = async (req, res, next) => {
 
     // Update password
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPwd, tokenRecord.user_id]);
-    
+
     // Invalidate token
     await pool.query('DELETE FROM tokens WHERE id = $1', [tokenRecord.id]);
 
@@ -254,9 +254,9 @@ export const getMe = async (req, res, next) => {
       LEFT JOIN profiles p ON u.id = p.user_id
       WHERE u.id = $1
     `;
-    
+
     const result = await pool.query(query, [userId]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ status: 'error', message: 'User not found' });
     }

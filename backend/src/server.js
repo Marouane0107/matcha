@@ -5,7 +5,13 @@ import pg from 'pg';
 import http from 'http';
 import { Server } from 'socket.io';
 import { pool } from './config/db.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.routes.js';
+import profileRoutes, { tagRouter } from './routes/profile.routes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
@@ -37,8 +43,13 @@ app.use((req, res, next) => {
   next();
 });
 
+// Static files for photo uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/profiles', profileRoutes);
+app.use('/api/tags', tagRouter);
 
 // Health check endpoint
 app.get('/health', async (req, res, next) => {
@@ -60,7 +71,7 @@ app.get('/health', async (req, res, next) => {
 // Socket.io events
 io.on('connection', (socket) => {
   console.log(`[Socket] connected: ${socket.id}`);
-  
+
   socket.on('disconnect', () => {
     console.log(`[Socket] disconnected: ${socket.id}`);
   });
