@@ -1,24 +1,23 @@
 {
-  "name": "@matcha/backend",
-  "version": "0.0.0",
-  "private": true,
-  "type": "commonjs",
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Phase 0 Backend Architecture",
+  "main": "src/server.js",
+  "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "start": "node --env-file-if-exists=.env dist/server.js"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
   },
   "dependencies": {
-    "@matcha/shared": "0.0.0",
-    "express": "^5.1.0",
-    "pg": "^8.16.3",
-    "socket.io": "^4.8.1"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.3",
-    "@types/node": "^22.18.0",
-    "@types/pg": "^8.15.5",
-    "tsx": "^4.20.0"
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.1.0",
+    "pg": "^8.13.0",
+    "sharp": "^0.35.5",
+    "socket.io": "^4.8.0"
   }
 }
