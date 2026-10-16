@@ -1,12 +1,12 @@
 :root {
   font-family: "Trebuchet MS", sans-serif;
-  color: #203d32;
-  background: #f7faf8;
+  color: #111827;
+  background: #f8fafc;
   font-synthesis: none;
-  --green: #235b45;
-  --muted: #576660;
-  --line: #cddbd2;
-  --rose: #993e52;
+  --green: #7132d3;
+  --muted: #596273;
+  --line: #e5e7eb;
+  --rose: #aa306e;
 }
 * { box-sizing: border-box; letter-spacing: 0; }
 body { margin: 0; min-width: 280px; }
@@ -15,21 +15,21 @@ a:hover { color: var(--rose); }
 button, input { font: inherit; }
 button, a, input { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 3px solid #a64c66; outline-offset: 4px; }
-.auth-shell { min-height: 100dvh; display: flex; flex-direction: column; background: linear-gradient(165deg, #edf5ef 0, #fff 42%, #fcf4f6 100%); }
+.auth-shell { min-height: 100dvh; display: flex; flex-direction: column; background: linear-gradient(120deg, #f5f1fa, #f8fafc 60%, #fff5f8); }
 .site-header { padding: 24px 6%; display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 1px solid var(--line); }
-.wordmark { font: bold 30px Georgia, serif; text-decoration: none; }
+.wordmark { font: bold 30px Georgia, serif; text-decoration: none; color: #111827; }
 .wordmark span { color: var(--rose); }
 .header-note { color: var(--muted); font-size: 14px; }
-.auth-main { width: min(100% - 40px, 440px); margin: 44px auto 56px; flex: 1; }
+.auth-main { width: min(100% - 80px, 1120px); margin: 48px auto; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); align-items: center; gap: 72px; }
 .eyebrow { font-size: 12px; text-transform: uppercase; color: var(--rose); font-weight: bold; margin: 0 0 12px; }
-h1 { font: 36px/1.12 Georgia, serif; margin: 0 0 14px; overflow-wrap: anywhere; }
+h1 { font: bold 28px/1.2 "Trebuchet MS", sans-serif; margin: 0 0 12px; overflow-wrap: anywhere; }
 h1:focus { outline: none; }
 .intro { color: var(--muted); line-height: 1.5; margin: 0 0 28px; }
 form { display: grid; gap: 16px; }
 fieldset { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: 18px; }
 .field { display: grid; gap: 7px; min-width: 0; }
 .field > label:first-child { font-size: 14px; font-weight: bold; }
-.field > input { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #8ea899; border-radius: 4px; background: #fff; color: #203d32; }
+.field > input { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #a8afbc; border-radius: 6px; background: #fff; color: #111827; }
 .field > input[aria-invalid="true"] { border-color: #ad304b; }
 .password-toggle { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); min-height: 24px; }
 .password-toggle input { width: 16px; height: 16px; accent-color: var(--green); }
@@ -39,7 +39,7 @@ fieldset { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: 1
 .name-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .primary, .secondary { min-height: 46px; padding: 11px 18px; border-radius: 4px; font-weight: bold; cursor: pointer; white-space: normal; overflow-wrap: anywhere; }
 .primary { width: 100%; background: var(--green); color: #fff; border: 1px solid var(--green); }
-.primary:hover { background: #164931; }
+.primary:hover { background: #5d24b6; }
 .secondary { background: #fff; color: var(--green); border: 1px solid var(--green); }
 button:disabled { cursor: wait; opacity: .65; }
 .quiet-link { justify-self: end; font-size: 14px; }
@@ -52,7 +52,46 @@ button:disabled { cursor: wait; opacity: .65; }
 @media (max-width: 480px) {
   .site-header { padding: 20px; }
   .auth-main { margin-top: 32px; }
-  h1 { font-size: 30px; }
+  h1 { font-size: 26px; }
   .name-row { grid-template-columns: 1fr; }
   .site-footer { flex-wrap: wrap; padding: 20px; }
+}
+.auth-card { min-width: 0; background: #fff; padding: 32px; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 32px #24153908; }
+.brand-panel { min-width: 0; }
+.brand-panel h2 { font: 42px/1.15 Georgia, serif; margin: 16px 0 20px; }
+.brand-panel h2 em { color: var(--green); font-weight: normal; }
+.brand-copy { max-width: 390px; color: var(--muted); line-height: 1.7; font-size: 16px; }
+.brand-photo { position: relative; margin-top: 28px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 8px; background: #e7e4ed; }
+.brand-photo img { width: 100%; height: 100%; object-fit: cover; }
+.brand-photo span { position: absolute; left: 16px; bottom: 16px; padding: 8px 12px; background: #fff; color: #111827; font-size: 12px; border-radius: 4px; }
+.brand-features { display: flex; flex-wrap: wrap; gap: 10px 20px; list-style: none; padding: 0; margin: 20px 0 0; font-size: 12px; color: var(--muted); }
+.brand-features li::before { content: "\2022"; margin-right: 7px; color: var(--rose); }
+.header-action { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; font-size: 14px; font-weight: bold; }
+.site-header nav { text-align: right; }
+.field > input:focus { border-color: var(--green); outline: 3px solid #7132d326; outline-offset: 1px; }
+.field > input:disabled { background: #f3f4f6; color: #596273; cursor: wait; }
+.primary, .secondary { display: inline-flex; justify-content: center; align-items: center; text-align: center; text-decoration: none; }
+.password-toggle { min-height: 32px; width: fit-content; cursor: pointer; }
+.notice { border-radius: 6px; font-size: 14px; }
+.success-heading { display: block; margin-bottom: 6px; font-size: 16px; }
+.skip-link { position: absolute; top: -80px; left: 16px; padding: 12px; background: white; z-index: 10; }
+.skip-link:focus { top: 12px; }
+.account-shell .auth-main { display: block; max-width: 900px; }
+.account-shell .auth-card { background: transparent; padding: 32px 0; border: 0; box-shadow: none; }
+.account-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 40px; }
+@media (max-width: 1023px) {
+  .auth-main { gap: 32px; width: min(100% - 48px, 1000px); }
+  .brand-panel h2 { font-size: 34px; }
+}
+@media (max-width: 800px) {
+  .brand-panel { display: none; }
+  .auth-main { display: block; width: min(100% - 40px, 460px); margin: 32px auto; }
+}
+@media (max-width: 480px) {
+  .auth-main { width: calc(100% - 24px); margin: 20px auto 32px; }
+  .auth-card { padding: 24px 20px; }
+  .header-note { display: none; }
+  .site-header { padding: 12px 20px; }
+  .site-footer { font-size: 11px; }
+  .account-shell .auth-card { padding: 20px 8px; }
 }

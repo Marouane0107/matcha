@@ -20,11 +20,11 @@ export default function VerifyEmailPage({ token }: { token: string | null }) {
   return (
     <section aria-labelledby="verify-title">
       <p className="eyebrow">One last step</p><h1 id="verify-title" tabIndex={-1}>Verify your email.</h1>
-      {!token ? <p className="notice error" role="alert">This verification link is missing or invalid. Request a new email below.</p> : result ? <SuccessNotice>{result}</SuccessNotice> : error ? <>
+      {!token ? <p className="notice error" role="alert">This verification link is missing or invalid. Request a new email below.</p> : result ? <SuccessNotice title="Email verified">{result}</SuccessNotice> : error ? <>
         <ErrorNotice error={error} />
         <button className="secondary" onClick={() => { request.current = null; setError(null); setAttempt(value => value + 1); }}>Try again</button>
       </> : <p role="status">Verifying your email...</p>}
-      <p className="form-footer"><Link to="/login">Go to login</Link></p>
+      <p className="form-footer"><Link className={result ? "primary" : undefined} to="/login">Continue to sign in</Link></p>
       <Link to="/resend-verification">Resend verification email</Link>
     </section>
   );
