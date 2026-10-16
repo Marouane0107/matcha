@@ -21,11 +21,11 @@ export default function ProfilePlaceholderPage() {
   }
   return (
     <section aria-labelledby="profile-title">
-      <p className="eyebrow">Your account</p><h1 id="profile-title" tabIndex={-1}>Hello, {user?.firstName}.</h1>
-      <p className="intro">You are signed in as {user?.username}.</p>
-      <p>Your profile is coming next.</p>
+      <header className="account-heading"><div><p className="eyebrow">Your account</p><strong>{user?.firstName} &middot; @{user?.username}</strong></div><button className="secondary" disabled={busy} onClick={() => void logout()}>{busy ? "Logging out..." : "Log out"}</button></header>
+      <h1 id="profile-title" tabIndex={-1}>Profile coming next</h1>
+      <p className="intro">You're signed in, {user?.firstName}. Your account is ready.</p>
+      <p>Authentication is working. Creating your profile is the next implementation phase.</p>
       <ErrorNotice error={error} />
-      <button className="secondary" disabled={busy} onClick={() => void logout()}>{busy ? "Logging out..." : "Log out"}</button>
     </section>
   );
 }

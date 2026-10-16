@@ -24,8 +24,9 @@ export default function ResetPasswordPage({ token }: { token: string | null }) {
   }
   return (
     <section aria-labelledby="reset-title">
-      <p className="eyebrow">A fresh start</p><h1 id="reset-title" tabIndex={-1}>Reset your password.</h1>
-      {!token ? <p className="notice error" role="alert">This reset link is missing or invalid. Request a new link.</p> : message ? <SuccessNotice>{message}</SuccessNotice> :
+      <p className="eyebrow">A fresh start</p><h1 id="reset-title" tabIndex={-1}>Create a new password</h1>
+      <p className="intro">Make it unique. Keep it yours.</p>
+      {!token ? <p className="notice error" role="alert">This reset link is missing or invalid. Request a new link.</p> : message ? <SuccessNotice title="Password updated">{message}</SuccessNotice> :
         <form onSubmit={submit} noValidate aria-busy={task.busy}>
           <ErrorNotice error={task.error} />
           <fieldset disabled={task.busy}>
@@ -34,7 +35,7 @@ export default function ResetPasswordPage({ token }: { token: string | null }) {
             <button className="primary" type="submit">{task.busy ? "Resetting..." : "Reset password"}</button>
           </fieldset>
         </form>}
-      <p className="form-footer"><Link to="/login">Back to login</Link></p>
+      <p className="form-footer"><Link className={message ? "primary" : undefined} to="/login">Back to sign in</Link></p>
       {!message && <Link to="/forgot-password">Request a new reset link</Link>}
     </section>
   );
