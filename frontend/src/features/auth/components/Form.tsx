@@ -20,8 +20,8 @@ export function ErrorNotice({ error }: { error: unknown }) {
   return error ? <div className="notice error" role="alert">{errorMessage(error)}</div> : null;
 }
 
-export function SuccessNotice({ children }: { children: ReactNode }) {
-  return <div className="notice success" role="status">{children}</div>;
+export function SuccessNotice({ children, title = "Check your inbox" }: { children: ReactNode; title?: string }) {
+  return <div className="notice success" role="status"><strong className="success-heading"><span aria-hidden="true">&#10003; </span>{title}</strong>{children}</div>;
 }
 
 export function useTask() {

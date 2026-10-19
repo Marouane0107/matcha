@@ -32,7 +32,7 @@ export default function RegisterPage() {
     <section aria-labelledby="register-title">
       <p className="eyebrow">Start with a hello</p><h1 id="register-title" tabIndex={-1}>Meet your people.</h1>
       <p className="intro">Create your Matcha account.</p>
-      {message ? <><SuccessNotice>{message}</SuccessNotice><p>Check your inbox before logging in.</p><Link to="/resend-verification">Resend verification email</Link></> :
+      {message ? <><SuccessNotice>{message}</SuccessNotice><p><Link className="primary" to="/login">Continue to sign in</Link></p><Link to="/resend-verification">Resend verification email</Link></> :
         <form onSubmit={submit} noValidate aria-busy={task.busy}>
           <ErrorNotice error={task.error} />
           <fieldset disabled={task.busy}>

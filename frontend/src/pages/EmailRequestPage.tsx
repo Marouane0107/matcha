@@ -25,8 +25,8 @@ export default function EmailRequestPage({ mode }: { mode: "forgot" | "resend" }
   return (
     <section aria-labelledby="email-title">
       <p className="eyebrow">Let's get you back</p>
-      <h1 id="email-title" tabIndex={-1}>{forgot ? "Forgot your password?" : "Check your inbox."}</h1>
-      <p className="intro">{forgot ? "Request a password reset link." : "Request a new email verification link."}</p>
+      <h1 id="email-title" tabIndex={-1}>{forgot ? "Forgot your password?" : "Verify your account."}</h1>
+      <p className="intro">{forgot ? "Enter your email and we'll send reset instructions if an account exists." : "Enter your email to request a new verification link."}</p>
       {message ? <SuccessNotice>{message}</SuccessNotice> : <form onSubmit={submit} noValidate aria-busy={task.busy}>
         <ErrorNotice error={task.error} />
         <fieldset disabled={task.busy}>

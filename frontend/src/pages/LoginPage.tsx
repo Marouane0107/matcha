@@ -30,17 +30,16 @@ export default function LoginPage() {
     <section aria-labelledby="login-title">
       <p className="eyebrow">Your next chapter</p>
       <h1 id="login-title" tabIndex={-1}>Welcome back.</h1>
-      <p className="intro">Good to see you again.</p>
+      <p className="intro">Sign in to continue to Matcha.</p>
       {location.state?.logout === "revoked" && <p className="notice success" role="status">You have been logged out of all sessions.</p>}
       {location.state?.logout === "local" && <p className="notice warning" role="status">You are logged out on this device. We couldn't confirm logout on the server; other sessions may remain active until they expire.</p>}
       <form onSubmit={submit} noValidate aria-busy={task.busy}>
-        <ErrorNotice error={task.error} />
-        {unverified && <Link to="/resend-verification">Send a new verification email</Link>}
+        {unverified ? <div className="notice warning" role="alert"><strong className="success-heading">Verify your email first</strong><p>Check your inbox to finish setting up your account.</p><Link to="/resend-verification">Send a new verification email</Link></div> : <ErrorNotice error={task.error} />}
         <fieldset disabled={task.busy}>
           <Field label="Username" name="username" autoComplete="username" autoCapitalize="none" required error={fields.username} />
           <Field label="Password" name="password" type="password" autoComplete="current-password" required error={fields.password} />
           <Link className="quiet-link" to="/forgot-password">Forgot password?</Link>
-          <button className="primary" type="submit">{task.busy ? "Logging in..." : "Log in"}</button>
+          <button className="primary" type="submit">{task.busy ? "Signing in..." : "Sign in"}</button>
         </fieldset>
       </form>
       <p className="form-footer">New here? <Link to="/register">Create an account</Link></p>
