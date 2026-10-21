@@ -23,8 +23,9 @@ export function unwrap<T>(response: ApiResponse<T>, status = 400): T {
 }
 
 export interface RequestOptions<T> {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
+  responseType?: "image";
   accessToken?: string;
   status: number;
   validate: (value: unknown) => value is T;
@@ -47,22 +48,30 @@ export function createApiClient(
     } catch {
       throw new TransportError("configuration");
     }
-    const headers = new Headers({ Accept: "application/json" });
-    if (options.body !== undefined) headers.set("Content-Type", "application/json");
+    const multipart = options.body instanceof FormData;
+    const headers = new Headers({ Accept: options.responseType === "image" ? "image/jpeg, image/png, image/webp" : "application/json" });
+    if (options.body !== undefined && !multipart) headers.set("Content-Type", "application/json");
     if (options.accessToken) headers.set("Authorization", `Bearer ${options.accessToken}`);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
       const response = await fetcher(url, {
         method: options.method ?? "GET",
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        body: multipart ? options.body as FormData : options.body === undefined ? undefined : JSON.stringify(options.body),
         headers,
         credentials: "omit",
+        cache: "no-store",
         redirect: "error",
         referrerPolicy: "no-referrer",
         signal: controller.signal,
       });
       if (response.status === 401 && options.accessToken) invalidate(options.accessToken);
+      if (response.ok && options.responseType === "image") {
+        if (response.status !== options.status || !["image/jpeg", "image/png", "image/webp"].includes(response.headers.get("content-type")?.split(";")[0] ?? "")) throw new TransportError("malformed");
+        const image = await response.blob();
+        if (!options.validate(image)) throw new TransportError("malformed");
+        return image;
+      }
       if (response.status === 204) {
         if (options.status !== 204 || !options.validate(undefined)) throw new TransportError("malformed");
         return undefined as T;
