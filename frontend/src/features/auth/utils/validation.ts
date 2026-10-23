@@ -26,7 +26,7 @@ export function cleanErrors(values: Record<string, string | undefined>): FieldEr
 
 export function readFragmentToken(location: Pick<Location, "hash" | "pathname" | "search">, history: Pick<History, "replaceState" | "state">) {
   const path = location.pathname;
-  if (path !== "/verify-email" && path !== "/reset-password") return { path, token: null };
+  if (path !== "/verify-email" && path !== "/reset-password" && path !== "/verify-email-change") return { path, token: null };
   const params = new URLSearchParams(location.hash.slice(1));
   const values = params.getAll("token");
   history.replaceState(history.state, "", path + location.search);
