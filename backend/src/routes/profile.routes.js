@@ -12,17 +12,14 @@ import {
 
 const router = Router();
 
-// Profile endpoints
+// Profile endpoints — mounted at /api/profile
 router.get('/me', requireAuth, getMyProfile);
 router.patch('/me', requireAuth, updateMyProfile);
 
-// Photo endpoints
-router.post('/me/photos', requireAuth, uploadPhotoMiddleware, uploadPhoto);
-router.delete('/me/photos/:id', requireAuth, deletePhoto);
-router.patch('/me/photos/:id/profile-picture', requireAuth, setProfilePicture);
-
-// Also expose /api/profiles/tags if accessed via profiles router
-router.get('/tags', requireAuth, getAllTags);
+// Picture endpoints — match shared contract paths
+router.post('/pictures', requireAuth, uploadPhotoMiddleware, uploadPhoto);
+router.delete('/pictures/:id', requireAuth, deletePhoto);
+router.patch('/pictures/:id/main', requireAuth, setProfilePicture);
 
 export default router;
 
