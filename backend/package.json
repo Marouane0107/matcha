@@ -6,9 +6,15 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "build": "echo 'No build step for JS backend'",
+    "typecheck": "echo 'No typecheck for JS backend'",
+    "seed": "node db/seed.js",
+    "db:reset": "node db/reset.js"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.6.0",
+    "@matcha/shared": "*",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

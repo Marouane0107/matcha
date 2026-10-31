@@ -16,6 +16,7 @@ CREATE TABLE profiles (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     first_name VARCHAR(50),
     last_name VARCHAR(50),
+    birth_date DATE,
     gender VARCHAR(20),
     sexual_preference VARCHAR(20) DEFAULT 'bisexual',
     biography TEXT,
