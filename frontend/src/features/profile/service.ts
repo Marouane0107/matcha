@@ -1,11 +1,12 @@
 import { API_ROUTES } from "@matcha/shared";
-import type { Acknowledgement, ChangeEmailRequest, VerifyEmailChangeRequest, Picture, PictureCollection, ProfileUpdateRequest, PublicProfile, Tag, UserProfile } from "@matcha/shared";
+import type { Acknowledgement, ChangeEmailRequest, VerifyEmailChangeRequest, Picture, PictureCollection, ProfileUpdateRequest, PublicProfile, Tag, UserProfile, LocationUpdateRequest } from "@matcha/shared";
 import { createApiClient, isRecord } from "../../services/api/client";
 import { genders, preferences } from "./validation";
 
 export interface ProfileService {
   me(token: string): Promise<UserProfile>;
   update(request: ProfileUpdateRequest, token: string): Promise<UserProfile>;
+  updateLocation(request: LocationUpdateRequest, token: string): Promise<UserProfile>;
   publicProfile(username: string, token: string): Promise<PublicProfile>;
   tags(token: string): Promise<Tag[]>;
   image(id: string, token: string): Promise<Blob>;
@@ -38,6 +39,7 @@ export function createRealProfileService(client: ReturnType<typeof createApiClie
   return {
     me: accessToken => client.request(routes.ME, { accessToken, status: 200, validate: isUserProfile }),
     update: (body, accessToken) => client.request(routes.ME, { method: "PATCH", body, accessToken, status: 200, validate: isUserProfile }),
+    updateLocation: (body, accessToken) => client.request(routes.LOCATION, { method: "PATCH", body, accessToken, status: 200, validate: isUserProfile }),
     publicProfile: (username, accessToken) => client.request(routes.PUBLIC.replace(":username", encodeURIComponent(username)), { accessToken, status: 200, validate: isPublicProfile }),
     tags: accessToken => client.request(routes.TAGS, { accessToken, status: 200, validate: (value): value is Tag[] => Array.isArray(value) && value.every(isTag) }),
     image: (id, accessToken) => client.request(picturePath(routes.PICTURE, id), { accessToken, responseType: "image", status: 200, validate: (value): value is Blob => value instanceof Blob && value.size > 0 }),

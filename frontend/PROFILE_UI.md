@@ -57,8 +57,8 @@ The public screen has no fake Like/Unlike/Block/Report controls or visit side ef
   saved drafts navigate without prompting. Session invalidation is not blocked.
 - Backend profileComplete controls discovery copy. The eight-item Phase 0 checklist
   explains missing data but does not override backend eligibility.
-- Location is display-only. Missing location remains an honest incomplete state;
-  no coordinates, GPS prompts or duplicate location service were introduced.
+- Location editing is now available in Phase 2b at `/profile/location`; see
+  [LOCATION_UI.md](LOCATION_UI.md) for consent, privacy, mocks and verification.
 - Active email is not changed locally on request acknowledgement. Verification
   uses a public call without bearer, strips the fragment and clears AuthSession.
   Backend one-use enforcement and all-device revocation await API implementation.
@@ -183,8 +183,8 @@ Added:
 ## Remaining Integration and Subject Work
 
 All real profile/email-change journeys await the backend compatibility fixes. The
-backend environment was not available. Location editing is deliberately deferred
-to feat/location-ui; discovery, search, interactions, visits, chat and notifications
+backend environment was not available. Location editing is implemented in
+feat/location-ui; discovery, search, interactions, visits, chat and notifications
 remain future branches. No database, backend, shared or realtime changes were made.
 Firefox verification and Vite advisory remediation remain separate follow-ups.
 

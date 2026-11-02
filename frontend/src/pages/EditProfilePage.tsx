@@ -78,6 +78,7 @@ function ProfileEditor({ profile }: { profile: UserProfile }) {
         {tagError ? <><ErrorNotice error={tagError} /><button className="secondary" type="button" onClick={() => setTagAttempt(value => value + 1)}>Retry interests</button></> : !tags ? <p role="status">Loading interests...</p> : <div className="tag-options" role="group" aria-label="Interests" aria-describedby="tags-help">{tags.map(tag => <label key={tag.id} className={draft.tagIds.includes(tag.id) ? "selected" : ""}><input type="checkbox" checked={draft.tagIds.includes(tag.id)} disabled={!draft.tagIds.includes(tag.id) && draft.tagIds.length >= 10} onChange={() => change("tagIds", toggleTag(draft.tagIds, tag.id))} />{tag.name}</label>)}</div>}
         {errors.tagIds && <p className="field-error" role="alert">{errors.tagIds}</p>}
       </section>
+      <p><Link to="/profile/location">Edit location</Link></p>
       <div className="save-bar"><p className="muted">{dirty ? "Unsaved changes" : "Up to date"}</p><Link className="secondary" to="/profile">Back to profile</Link><button className="primary compact" disabled={!tags || !dirty} type="submit">{task.busy ? "Saving..." : "Save changes"}</button></div>
     </fieldset>
   </form>;

@@ -13,6 +13,7 @@ import PicturesPage from "./pages/PicturesPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import AccountPage from "./pages/AccountPage";
 import VerifyEmailChangePage from "./pages/VerifyEmailChangePage";
+import LocationPage from "./pages/LocationPage";
 
 export default function App({ initialLink }: { initialLink: { path: string; token: string | null } }) {
   return (
@@ -33,6 +34,7 @@ export default function App({ initialLink }: { initialLink: { path: string; toke
         <Route element={<AppLayout />}>
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/edit" element={<EditProfilePage />} />
+          <Route path="/profile/location" element={<LocationPage />} />
           <Route path="/profile/pictures" element={<PicturesPage />} />
           <Route path="/profiles/:username" element={<PublicProfilePage />} />
           <Route path="/account" element={<AccountPage />} />

@@ -73,7 +73,7 @@ export function ProfilePresentation({ profile, owner = false }: { profile: UserP
         {owner && "email" in profile && <div><dt>Verified email</dt><dd>{profile.email || "Not provided"}</dd></div>}
       </dl>
       {!owner && "isConnected" in profile && <section className="profile-section"><h2>Connection</h2><p>{profile.isConnected ? "You are connected." : "You are not connected."}</p><ul className="relationship-list"><li>{profile.likedByMe ? "You like this profile." : "You haven't liked this profile."}</li><li>{profile.hasLikedMe ? "This person likes you." : "No like received."}</li></ul></section>}
-      {owner && !profile.location && <p className="notice warning">No location saved. Location settings will be available in the next phase; discovery remains unavailable until your location is saved.</p>}
+      {owner && <p className={profile.location ? "profile-section" : "notice warning"}>{!profile.location && "No location saved. Discovery requires a saved location. "}<Link to="/profile/location">{profile.location ? "Edit location" : "Add your location"}</Link></p>}
     </div>
   </div>;
 }
