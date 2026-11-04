@@ -7,6 +7,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     is_verified BOOLEAN DEFAULT FALSE,
+    last_seen TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -17,8 +18,8 @@ CREATE TABLE profiles (
     first_name VARCHAR(50),
     last_name VARCHAR(50),
     birth_date DATE,
-    gender VARCHAR(20),
-    sexual_preference VARCHAR(20) DEFAULT 'bisexual',
+    gender VARCHAR(20) CHECK (gender IN ('man', 'woman', 'non_binary')),
+    sexual_preference VARCHAR(20) NOT NULL DEFAULT 'everyone' CHECK (sexual_preference IN ('men', 'women', 'everyone')),
     biography TEXT,
     fame_rating FLOAT DEFAULT 0.0,
     latitude FLOAT,
@@ -98,4 +99,14 @@ CREATE TABLE tokens (
     type VARCHAR(50) NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(50) NOT NULL,
+    details TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (reporter_id, reported_id)
 );

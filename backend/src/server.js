@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.routes.js';
 import profileRoutes, { tagRouter } from './routes/profile.routes.js';
 import browseRoutes from './routes/browse.routes.js';
+import interactionRoutes, { interactionsRouter } from './routes/interaction.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,7 +49,9 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Routes — aligned with shared API_ROUTES contract
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);      // singular — matches API_ROUTES.PROFILE.ME
-app.use('/api/profiles', browseRoutes);       // plural — suggestions & search
+app.use('/api/profiles', browseRoutes);       // plural — suggestions & search (registered first)
+app.use('/api/profiles', interactionRoutes);  // plural — public profile, like/block/report
+app.use('/api/interactions', interactionsRouter);
 app.use('/api/tags', tagRouter);
 
 // Health check endpoint

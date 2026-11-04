@@ -16,6 +16,7 @@ const fileFilter = (req, file, cb) => {
   if (mimeMatches && extMatches) {
     cb(null, true);
   } else {
+    /** @type {Error & { statusCode?: number }} */
     const error = new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.');
     error.statusCode = 400;
     cb(error, false);
