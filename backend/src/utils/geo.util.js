@@ -45,18 +45,14 @@ export function haversineSQL(userLatParam, userLonParam, targetLatCol = 'p.latit
 //   2. Any user blocked by OR blocking the current user.
 //   3. Incompatible gender ↔ sexual-preference combinations.
 //
-// Convention for gender / preference stored in the DB (from seed.js):
-//   gender:            'male' | 'female' | 'other'
-//   sexual_preference: 'heterosexual' | 'homosexual' | 'bisexual'
+// Convention for gender / preference stored in the DB (Phase 0 shared contract):
+//   gender:            'man' | 'woman' | 'non_binary'
+//   sexual_preference: 'men' | 'women' | 'everyone'
 //
 // Compatibility matrix:
-//   bisexual  → matches everyone
-//   heterosexual male   → target must be female
-//   heterosexual female → target must be male
-//   homosexual male     → target must be male
-//   homosexual female   → target must be female
-//   heterosexual other  → matches everyone (treated as bisexual)
-//   homosexual other    → matches everyone (treated as bisexual)
+//   everyone → matches every gender (including non_binary)
+//   men      → target must be a man
+//   women    → target must be a woman
 //
 // The filter is bidirectional: the current user must be interested in
 // the target's gender AND the target must be interested in the current
@@ -90,24 +86,18 @@ export function eligibilityFilterSQL(currentUserIdParam, currentGenderParam, cur
   // Current user → target: does the current user's preference match the target's gender?
   const currentToTarget = `
     (
-      ${pref} = 'bisexual'
-      OR ${gender} = 'other'
-      OR (${pref} = 'heterosexual' AND ${gender} = 'male'   AND p.gender = 'female')
-      OR (${pref} = 'heterosexual' AND ${gender} = 'female' AND p.gender = 'male')
-      OR (${pref} = 'homosexual'   AND ${gender} = 'male'   AND p.gender = 'male')
-      OR (${pref} = 'homosexual'   AND ${gender} = 'female' AND p.gender = 'female')
+      ${pref} = 'everyone'
+      OR (${pref} = 'men' AND p.gender = 'man')
+      OR (${pref} = 'women' AND p.gender = 'woman')
     )
   `;
 
   // Target → current user: does the target's preference match the current user's gender?
   const targetToCurrent = `
     (
-      p.sexual_preference = 'bisexual'
-      OR p.gender = 'other'
-      OR (p.sexual_preference = 'heterosexual' AND p.gender = 'male'   AND ${gender} = 'female')
-      OR (p.sexual_preference = 'heterosexual' AND p.gender = 'female' AND ${gender} = 'male')
-      OR (p.sexual_preference = 'homosexual'   AND p.gender = 'male'   AND ${gender} = 'male')
-      OR (p.sexual_preference = 'homosexual'   AND p.gender = 'female' AND ${gender} = 'female')
+      p.sexual_preference = 'everyone'
+      OR (p.sexual_preference = 'men' AND ${gender} = 'man')
+      OR (p.sexual_preference = 'women' AND ${gender} = 'woman')
     )
   `;
 
