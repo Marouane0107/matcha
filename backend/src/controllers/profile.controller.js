@@ -4,10 +4,16 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { apiSuccess, apiError, ERROR_CODES, DEFAULT_SEXUAL_PREFERENCE } from '../config/shared.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.resolve(__dirname, '../../uploads');
+
+// Allowed gender values per the shared contract
+const VALID_GENDERS = ['man', 'woman', 'non_binary'];
+// Allowed sexual preference values per the shared contract
+const VALID_SEXUAL_PREFERENCES = ['men', 'women', 'everyone'];
 
 /**
  * Helper to compute whether a user's profile is complete:
@@ -35,6 +41,7 @@ export const fetchFullProfile = async (clientOrPool, userId) => {
       p.id AS profile_id,
       p.first_name,
       p.last_name,
+      p.birth_date,
       p.gender,
       p.sexual_preference,
       p.biography,
@@ -85,6 +92,8 @@ export const fetchFullProfile = async (clientOrPool, userId) => {
     profileId: row.profile_id,
     firstName: row.first_name,
     lastName: row.last_name,
+    birthDate: row.birth_date,
+    dateOfBirth: row.birth_date,
     gender: row.gender,
     sexualPreference: row.sexual_preference,
     biography: row.biography,
@@ -101,7 +110,7 @@ export const fetchFullProfile = async (clientOrPool, userId) => {
 };
 
 /**
- * GET /api/profiles/me
+ * GET /api/profile/me
  * Fetch the authenticated user's profile data
  */
 export const getMyProfile = async (req, res, next) => {
@@ -110,23 +119,17 @@ export const getMyProfile = async (req, res, next) => {
     const profile = await fetchFullProfile(pool, userId);
 
     if (!profile) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'User profile not found'
-      });
+      return res.status(404).json(apiError(ERROR_CODES.PROFILE_NOT_FOUND, 'User profile not found'));
     }
 
-    res.status(200).json({
-      status: 'success',
-      data: { profile }
-    });
+    res.status(200).json(apiSuccess({ profile }));
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * PATCH /api/profiles/me
+ * PATCH /api/profile/me
  * Update gender, sexual preference, biography, basic identity fields, and tags
  */
 export const updateMyProfile = async (req, res, next) => {
@@ -154,28 +157,30 @@ export const updateMyProfile = async (req, res, next) => {
 
     // Field validations
     if (newFirstName !== undefined && (typeof newFirstName !== 'string' || newFirstName.trim().length === 0 || newFirstName.length > 50)) {
-      return res.status(400).json({ status: 'error', message: 'First name must be between 1 and 50 characters' });
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'First name must be between 1 and 50 characters'));
     }
     if (newLastName !== undefined && (typeof newLastName !== 'string' || newLastName.trim().length === 0 || newLastName.length > 50)) {
-      return res.status(400).json({ status: 'error', message: 'Last name must be between 1 and 50 characters' });
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Last name must be between 1 and 50 characters'));
     }
     if (newGender !== undefined && newGender !== null) {
-      if (typeof newGender !== 'string' || newGender.trim().length === 0 || newGender.length > 20) {
-        return res.status(400).json({ status: 'error', message: 'Gender must be a valid string up to 20 characters' });
+      const normalizedGender = typeof newGender === 'string' ? newGender.trim().toLowerCase() : '';
+      if (!VALID_GENDERS.includes(normalizedGender)) {
+        return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, `Gender must be one of: ${VALID_GENDERS.join(', ')}`));
       }
     }
     if (newSexualPreference !== undefined && newSexualPreference !== null) {
-      if (typeof newSexualPreference !== 'string' || newSexualPreference.trim().length === 0 || newSexualPreference.length > 20) {
-        return res.status(400).json({ status: 'error', message: 'Sexual preference must be a valid string up to 20 characters' });
+      const normalizedPref = typeof newSexualPreference === 'string' ? newSexualPreference.trim().toLowerCase() : '';
+      if (!VALID_SEXUAL_PREFERENCES.includes(normalizedPref)) {
+        return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, `Sexual preference must be one of: ${VALID_SEXUAL_PREFERENCES.join(', ')}`));
       }
     }
     if (newBiography !== undefined && newBiography !== null) {
       if (typeof newBiography !== 'string' || newBiography.length > 1000) {
-        return res.status(400).json({ status: 'error', message: 'Biography must not exceed 1000 characters' });
+        return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Biography must not exceed 1000 characters'));
       }
     }
     if (tags !== undefined && !Array.isArray(tags)) {
-      return res.status(400).json({ status: 'error', message: 'Tags must be an array of tag names' });
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Tags must be an array of tag names'));
     }
 
     await client.query('BEGIN');
@@ -209,7 +214,7 @@ export const updateMyProfile = async (req, res, next) => {
     }
     if (newSexualPreference !== undefined) {
       updates.push(`sexual_preference = $${paramIndex++}`);
-      values.push(newSexualPreference !== null ? newSexualPreference.trim().toLowerCase() : 'bisexual');
+      values.push(newSexualPreference !== null ? newSexualPreference.trim().toLowerCase() : DEFAULT_SEXUAL_PREFERENCE);
     }
     if (newBiography !== undefined) {
       updates.push(`biography = $${paramIndex++}`);
@@ -279,13 +284,10 @@ export const updateMyProfile = async (req, res, next) => {
     // Fetch and return the fresh profile
     const updatedProfile = await fetchFullProfile(pool, userId);
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        message: 'Profile updated successfully',
-        profile: updatedProfile
-      }
-    });
+    res.status(200).json(apiSuccess({
+      message: 'Profile updated successfully',
+      profile: updatedProfile
+    }));
   } catch (error) {
     await client.query('ROLLBACK');
     next(error);
@@ -313,19 +315,14 @@ export const getAllTags = async (req, res, next) => {
 
     const result = await pool.query(query, values);
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        tags: result.rows
-      }
-    });
+    res.status(200).json(apiSuccess({ tags: result.rows }));
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * POST /api/profiles/me/photos
+ * POST /api/profile/pictures
  * Securely uploads a profile photo (max 5 photos per user).
  * Automatically marks as profile picture if it is the user's first photo.
  */
@@ -334,10 +331,7 @@ export const uploadPhoto = async (req, res, next) => {
     const userId = req.user.id;
 
     if (!req.file || !req.file.buffer) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'No image file uploaded'
-      });
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'No image file uploaded'));
     }
 
     // Business rule: Enforce maximum 5 photos
@@ -348,10 +342,7 @@ export const uploadPhoto = async (req, res, next) => {
     const photoCount = countResult.rows[0].count;
 
     if (photoCount >= 5) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'A user can have a maximum of 5 photos. Please delete a photo before uploading a new one.'
-      });
+      return res.status(400).json(apiError(ERROR_CODES.UPLOAD_LIMIT_REACHED, 'A user can have a maximum of 5 photos. Please delete a photo before uploading a new one.'));
     }
 
     // Decode, resize, and convert to WebP using Sharp
@@ -362,10 +353,7 @@ export const uploadPhoto = async (req, res, next) => {
         .toFormat('webp', { quality: 85 })
         .toBuffer();
     } catch (sharpErr) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Failed to process image. File may be corrupted or not a valid image format.'
-      });
+      return res.status(400).json(apiError(ERROR_CODES.UPLOAD_INVALID_TYPE, 'Failed to process image. File may be corrupted or not a valid image format.'));
     }
 
     // Ensure uploads directory exists
@@ -398,21 +386,18 @@ export const uploadPhoto = async (req, res, next) => {
     // Fetch updated profile to provide the fresh profileComplete status
     const updatedProfile = await fetchFullProfile(pool, userId);
 
-    res.status(201).json({
-      status: 'success',
-      data: {
-        message: 'Photo uploaded successfully',
-        photo: uploadedPhoto,
-        profile: updatedProfile
-      }
-    });
+    res.status(201).json(apiSuccess({
+      message: 'Photo uploaded successfully',
+      photo: uploadedPhoto,
+      profile: updatedProfile
+    }));
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * DELETE /api/profiles/me/photos/:id
+ * DELETE /api/profile/pictures/:pictureId
  * Deletes a user's photo. If the deleted photo was the primary profile picture,
  * automatically promotes the oldest remaining photo.
  */
@@ -429,10 +414,7 @@ export const deletePhoto = async (req, res, next) => {
     );
 
     if (photoResult.rows.length === 0) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Photo not found or you are not authorized to delete it'
-      });
+      return res.status(404).json(apiError(ERROR_CODES.NOT_FOUND, 'Photo not found or you are not authorized to delete it'));
     }
 
     const photo = photoResult.rows[0];
@@ -468,13 +450,10 @@ export const deletePhoto = async (req, res, next) => {
 
     const updatedProfile = await fetchFullProfile(pool, userId);
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        message: 'Photo deleted successfully',
-        profile: updatedProfile
-      }
-    });
+    res.status(200).json(apiSuccess({
+      message: 'Photo deleted successfully',
+      profile: updatedProfile
+    }));
   } catch (error) {
     await client.query('ROLLBACK');
     next(error);
@@ -484,7 +463,7 @@ export const deletePhoto = async (req, res, next) => {
 };
 
 /**
- * PATCH /api/profiles/me/photos/:id/profile-picture
+ * PATCH /api/profile/pictures/:pictureId/main
  * Set a specific photo as the primary profile picture
  */
 export const setProfilePicture = async (req, res, next) => {
@@ -500,10 +479,7 @@ export const setProfilePicture = async (req, res, next) => {
     );
 
     if (checkPhoto.rows.length === 0) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Photo not found or you are not authorized to modify it'
-      });
+      return res.status(404).json(apiError(ERROR_CODES.NOT_FOUND, 'Photo not found or you are not authorized to modify it'));
     }
 
     await client.query('BEGIN');
@@ -527,14 +503,11 @@ export const setProfilePicture = async (req, res, next) => {
 
     const updatedProfile = await fetchFullProfile(pool, userId);
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        message: 'Profile picture updated successfully',
-        photo: updateResult.rows[0],
-        profile: updatedProfile
-      }
-    });
+    res.status(200).json(apiSuccess({
+      message: 'Profile picture updated successfully',
+      photo: updateResult.rows[0],
+      profile: updatedProfile
+    }));
   } catch (error) {
     await client.query('ROLLBACK');
     next(error);
@@ -542,4 +515,3 @@ export const setProfilePicture = async (req, res, next) => {
     client.release();
   }
 };
-

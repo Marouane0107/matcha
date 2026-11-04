@@ -2,24 +2,30 @@ import { pool } from '../config/db.js';
 import crypto from 'crypto';
 import { hashPassword, isPasswordStrong, verifyPassword } from '../utils/password.util.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email.util.js';
-import { generateToken } from '../utils/jwt.util.js';
+import { generateToken, getExpiresInSeconds } from '../utils/jwt.util.js';
+import { apiSuccess, apiError, ERROR_CODES } from '../config/shared.js';
 
 export const register = async (req, res, next) => {
   try {
     const { username, email, firstName, lastName, password } = req.body;
 
     if (!username || !email || !firstName || !lastName || !password) {
-      return res.status(400).json({ status: 'error', message: 'All fields are required' });
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'All fields are required'));
     }
 
     if (!isPasswordStrong(password)) {
-      return res.status(400).json({ status: 'error', message: 'Password is too weak' });
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Password is too weak. Must be at least 8 characters with uppercase, lowercase, number, and special character.'));
     }
 
-    const checkQuery = 'SELECT id FROM users WHERE email = $1 OR username = $2';
-    const checkResult = await pool.query(checkQuery, [email, username]);
-    if (checkResult.rows.length > 0) {
-      return res.status(409).json({ status: 'error', message: 'Email or username already exists' });
+    // Check for existing email or username separately to return specific error codes
+    const emailCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (emailCheck.rows.length > 0) {
+      return res.status(409).json(apiError(ERROR_CODES.EMAIL_ALREADY_EXISTS, 'Email already exists'));
+    }
+
+    const usernameCheck = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
+    if (usernameCheck.rows.length > 0) {
+      return res.status(409).json(apiError(ERROR_CODES.USERNAME_ALREADY_EXISTS, 'Username already exists'));
     }
 
     const hashedPwd = await hashPassword(password);
@@ -50,29 +56,28 @@ export const register = async (req, res, next) => {
     `;
     await pool.query(insertTokenQuery, [user.id, tokenHash, 'verification', expiresAt]);
 
-    // Send email (ignoring errors if SMTP fails during development, but it shouldn't crash registration ideally)
+    // Send email (ignoring errors if SMTP fails during development)
     try {
       await sendVerificationEmail(email, rawToken);
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
     }
 
-    res.status(201).json({
-      status: 'success',
-      data: {
-        message: 'Registration successful. Please check your email to verify your account.',
-        user: { id: user.id, username: user.username, email: user.email }
-      }
-    });
+    res.status(201).json(apiSuccess({
+      message: 'Registration successful. Please check your email to verify your account.',
+      user: { id: user.id, username: user.username, email: user.email }
+    }));
   } catch (error) {
     next(error);
   }
 };
 
-export const verify = async (req, res, next) => {
+export const verifyEmail = async (req, res, next) => {
   try {
-    const { token } = req.query;
-    if (!token) return res.status(400).json({ status: 'error', message: 'Token is required' });
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Token is required'));
+    }
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -80,14 +85,14 @@ export const verify = async (req, res, next) => {
     const tokenResult = await pool.query(tokenQuery, [tokenHash, 'verification']);
 
     if (tokenResult.rows.length === 0) {
-      return res.status(400).json({ status: 'error', message: 'Invalid or expired token' });
+      return res.status(400).json(apiError(ERROR_CODES.INVALID_VERIFICATION_TOKEN, 'Invalid or expired token'));
     }
 
     const tokenRecord = tokenResult.rows[0];
 
     if (new Date() > new Date(tokenRecord.expires_at)) {
       await pool.query('DELETE FROM tokens WHERE id = $1', [tokenRecord.id]);
-      return res.status(400).json({ status: 'error', message: 'Token has expired' });
+      return res.status(400).json(apiError(ERROR_CODES.INVALID_VERIFICATION_TOKEN, 'Token has expired'));
     }
 
     // Verify the user account
@@ -96,7 +101,7 @@ export const verify = async (req, res, next) => {
     // Consume the token
     await pool.query('DELETE FROM tokens WHERE id = $1', [tokenRecord.id]);
 
-    res.status(200).json({ status: 'success', data: { message: 'Account verified successfully' } });
+    res.status(200).json(apiSuccess({ message: 'Account verified successfully' }));
   } catch (error) {
     next(error);
   }
@@ -104,43 +109,56 @@ export const verify = async (req, res, next) => {
 
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ status: 'error', message: 'Email and password are required' });
+    if (!username || !password) {
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Username and password are required'));
     }
 
-    const query = 'SELECT * FROM users WHERE email = $1';
-    const result = await pool.query(query, [email]);
+    const query = 'SELECT * FROM users WHERE username = $1';
+    const result = await pool.query(query, [username]);
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ status: 'error', message: 'Invalid credentials' });
+      return res.status(401).json(apiError(ERROR_CODES.INVALID_CREDENTIALS, 'Invalid credentials'));
     }
 
     const user = result.rows[0];
 
     const isMatch = await verifyPassword(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ status: 'error', message: 'Invalid credentials' });
+      return res.status(401).json(apiError(ERROR_CODES.INVALID_CREDENTIALS, 'Invalid credentials'));
     }
 
     if (!user.is_verified) {
-      return res.status(403).json({ status: 'error', message: 'Please verify your email before logging in' });
+      return res.status(403).json(apiError(ERROR_CODES.EMAIL_NOT_VERIFIED, 'Please verify your email before logging in'));
     }
 
-    const token = generateToken({ id: user.id });
+    // Fetch profile to determine profileComplete
+    const profileResult = await pool.query(
+      `SELECT p.first_name, p.last_name, p.gender, p.biography
+       FROM profiles p WHERE p.user_id = $1`,
+      [user.id]
+    );
+    const profile = profileResult.rows[0];
+    const profileComplete = Boolean(profile?.gender && profile?.biography);
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email
-        },
-        token
-      }
-    });
+    const accessToken = generateToken({ id: user.id });
+    const expiresIn = getExpiresInSeconds();
+
+    res.status(200).json(apiSuccess({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: profile?.first_name || '',
+        lastName: profile?.last_name || '',
+        emailVerified: user.is_verified,
+        profileComplete,
+      },
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn,
+    }));
   } catch (error) {
     next(error);
   }
@@ -148,12 +166,7 @@ export const login = async (req, res, next) => {
 
 export const logout = async (req, res, next) => {
   try {
-    res.status(200).json({
-      status: 'success',
-      data: {
-        message: 'Logged out successfully'
-      }
-    });
+    res.status(200).json(apiSuccess({ message: 'Logged out successfully' }));
   } catch (error) {
     next(error);
   }
@@ -163,18 +176,17 @@ export const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ status: 'error', message: 'Email is required' });
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Email is required'));
     }
 
     // Always respond with success to prevent email enumeration
-    const successResponse = {
-      status: 'success',
-      data: { message: 'If an account exists with this email, a password reset link has been sent.' }
-    };
+    const successMsg = apiSuccess({
+      message: 'If an account exists with this email, a password reset link has been sent.'
+    });
 
     const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (userResult.rows.length === 0) {
-      return res.status(200).json(successResponse);
+      return res.status(200).json(successMsg);
     }
 
     const userId = userResult.rows[0].id;
@@ -197,7 +209,7 @@ export const forgotPassword = async (req, res, next) => {
       console.error('Failed to send reset email:', error);
     }
 
-    res.status(200).json(successResponse);
+    res.status(200).json(successMsg);
   } catch (error) {
     next(error);
   }
@@ -205,31 +217,31 @@ export const forgotPassword = async (req, res, next) => {
 
 export const resetPassword = async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body;
+    const { token, password } = req.body;
 
-    if (!token || !newPassword) {
-      return res.status(400).json({ status: 'error', message: 'Token and new password are required' });
+    if (!token || !password) {
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Token and password are required'));
     }
 
-    if (!isPasswordStrong(newPassword)) {
-      return res.status(400).json({ status: 'error', message: 'Password is too weak' });
+    if (!isPasswordStrong(password)) {
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Password is too weak'));
     }
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const tokenResult = await pool.query('SELECT * FROM tokens WHERE token_hash = $1 AND type = $2', [tokenHash, 'reset']);
 
     if (tokenResult.rows.length === 0) {
-      return res.status(400).json({ status: 'error', message: 'Invalid or expired reset token' });
+      return res.status(400).json(apiError(ERROR_CODES.INVALID_RESET_TOKEN, 'Invalid or expired reset token'));
     }
 
     const tokenRecord = tokenResult.rows[0];
 
     if (new Date() > new Date(tokenRecord.expires_at)) {
       await pool.query('DELETE FROM tokens WHERE id = $1', [tokenRecord.id]);
-      return res.status(400).json({ status: 'error', message: 'Reset token has expired' });
+      return res.status(400).json(apiError(ERROR_CODES.INVALID_RESET_TOKEN, 'Reset token has expired'));
     }
 
-    const hashedPwd = await hashPassword(newPassword);
+    const hashedPwd = await hashPassword(password);
 
     // Update password
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPwd, tokenRecord.user_id]);
@@ -237,7 +249,50 @@ export const resetPassword = async (req, res, next) => {
     // Invalidate token
     await pool.query('DELETE FROM tokens WHERE id = $1', [tokenRecord.id]);
 
-    res.status(200).json({ status: 'success', data: { message: 'Password has been reset successfully' } });
+    res.status(200).json(apiSuccess({ message: 'Password has been reset successfully' }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Email is required'));
+    }
+
+    // Always respond with success to prevent email enumeration
+    const successMsg = apiSuccess({
+      message: 'If an unverified account exists with this email, a new verification link has been sent.'
+    });
+
+    const userResult = await pool.query('SELECT id, is_verified FROM users WHERE email = $1', [email]);
+    if (userResult.rows.length === 0 || userResult.rows[0].is_verified) {
+      return res.status(200).json(successMsg);
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Delete any existing verification tokens for this user
+    await pool.query('DELETE FROM tokens WHERE user_id = $1 AND type = $2', [userId, 'verification']);
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await pool.query(
+      'INSERT INTO tokens (user_id, token_hash, type, expires_at) VALUES ($1, $2, $3, $4)',
+      [userId, tokenHash, 'verification', expiresAt]
+    );
+
+    try {
+      await sendVerificationEmail(email, rawToken);
+    } catch (emailError) {
+      console.error('Failed to resend verification email:', emailError);
+    }
+
+    res.status(200).json(successMsg);
   } catch (error) {
     next(error);
   }
@@ -258,28 +313,23 @@ export const getMe = async (req, res, next) => {
     const result = await pool.query(query, [userId]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'User not found' });
+      return res.status(404).json(apiError(ERROR_CODES.NOT_FOUND, 'User not found'));
     }
 
     const user = result.rows[0];
 
-    // Determine if profile is complete based on basic criteria (e.g. gender and bio set)
-    const isProfileComplete = Boolean(user.gender && user.biography);
+    // Determine if profile is complete based on basic criteria
+    const profileComplete = Boolean(user.gender && user.biography);
 
-    res.status(200).json({
-      status: 'success',
-      data: {
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          isVerified: user.is_verified,
-        },
-        isProfileComplete
-      }
-    });
+    res.status(200).json(apiSuccess({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      emailVerified: user.is_verified,
+      profileComplete,
+    }));
   } catch (error) {
     next(error);
   }
