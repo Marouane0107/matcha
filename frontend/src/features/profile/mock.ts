@@ -3,6 +3,7 @@ import type { ApiResponse, ErrorCode, PublicProfile, Tag, UserProfile } from "@m
 import { ApiRequestError, TransportError, unwrap } from "../../services/api/client";
 import type { ProfileService } from "./service";
 import { ageFromDate, completionChecklist, pictureError, validateProfile } from "./validation";
+import { locationErrors } from "../location/validation";
 
 export function createMockProfileService(delay = 250): ProfileService {
   const catalog: Tag[] = ["art", "books", "coffee", "cooking", "cycling", "design", "films", "hiking", "music", "photography", "travel", "yoga"].map((name, index) => ({ id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`, name }));
@@ -23,6 +24,22 @@ export function createMockProfileService(delay = 250): ProfileService {
   const existing = (id: string) => profile.pictures.find(picture => picture.id === id) ?? fail(ERROR_CODES.NOT_FOUND, 404);
   return {
     async me(token) { await wait(token); return success(profile); },
+    async updateLocation(request, token) {
+      await wait(token);
+      if (Object.keys(locationErrors(request)).length) fail(ERROR_CODES.VALIDATION_ERROR);
+      const city = request.city.trim();
+      if (city.toLowerCase() === "offline") throw new TransportError("network");
+      if (city.toLowerCase() === "unresolved") fail(ERROR_CODES.VALIDATION_ERROR);
+      if (city.toLowerCase() === "outage") fail(ERROR_CODES.INTERNAL_ERROR, 500);
+      const centroids: Record<string, [number, number]> = { casablanca: [33.5731, -7.5898], rabat: [34.0209, -6.8416], paris: [48.8566, 2.3522] };
+      const centroid = centroids[city.toLowerCase()];
+      if (request.mode === "manual" && !centroid) fail(ERROR_CODES.VALIDATION_ERROR);
+      profile.location = { city, neighborhood: request.neighborhood?.trim() || null, mode: request.mode,
+        latitude: request.mode === "gps" ? request.latitude : centroid[0],
+        longitude: request.mode === "gps" ? request.longitude : centroid[1] };
+      refresh();
+      return success(profile);
+    },
     async update(request, token) {
       await wait(token);
       if (Object.keys(validateProfile(request)).length || request.tagIds?.some(id => !catalog.some(tag => tag.id === id))) fail(ERROR_CODES.VALIDATION_ERROR);

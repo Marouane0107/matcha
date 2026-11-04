@@ -42,6 +42,11 @@
 .presence::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 8px; }
 .relationship-list { color: var(--muted); padding-left: 20px; line-height: 1.8; }
 .editor-width { max-width: 740px; margin: auto; }
+.location-methods { margin: 16px 0 28px; gap: 12px 28px; }
+.location-methods label { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.location-methods input { width: 18px; height: 18px; margin: 0; accent-color: var(--green); }
+.profile-form .notice { overflow-wrap: anywhere; }
+.profile-form .notice button { max-width: 100%; white-space: normal; }
 .edit-section { padding: 28px 0; border-top: 1px solid var(--line); display: grid; gap: 18px; }
 .edit-section h2, .edit-section p { margin: 0; }
 .field select, .field textarea { width: 100%; min-height: 48px; padding: 12px; border: 1px solid #a8afbc; border-radius: 6px; font: inherit; color: #111827; background: white; }

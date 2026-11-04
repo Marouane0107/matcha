@@ -54,6 +54,6 @@ export function completionChecklist(profile: UserProfile, emailVerified: boolean
     { label: "Biography", done: Boolean(profile.bio.trim()), href: "/profile/edit" },
     { label: "At least one interest", done: profile.tags.length > 0, href: "/profile/edit#interests" },
     { label: "Main photo", done: profile.pictures.some(picture => picture.isMain), href: "/profile/pictures" },
-    { label: "Saved location", done: profile.location !== null, href: null },
+    { label: "Saved location", done: profile.location !== null, href: "/profile/location" },
   ];
 }
