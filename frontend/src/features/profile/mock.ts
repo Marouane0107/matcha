@@ -4,6 +4,7 @@ import { ApiRequestError, TransportError, unwrap } from "../../services/api/clie
 import type { ProfileService } from "./service";
 import { ageFromDate, completionChecklist, pictureError, validateProfile } from "./validation";
 import { locationErrors } from "../location/validation";
+import { discoveryFixtures, discoveryPicture } from "../discovery/fixtures";
 
 export function createMockProfileService(delay = 250): ProfileService {
   const catalog: Tag[] = ["art", "books", "coffee", "cooking", "cycling", "design", "films", "hiking", "music", "photography", "travel", "yoga"].map((name, index) => ({ id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`, name }));
@@ -51,6 +52,8 @@ export function createMockProfileService(delay = 250): ProfileService {
     async publicProfile(username, token) {
       await wait(token);
       if (username === "offline") throw new TransportError("network");
+      const fixture = discoveryFixtures(catalog).find(item => item.username === username);
+      if (fixture) { const { distanceKm, commonTags, ...publicProfile } = fixture; void distanceKm; void commonTags; return success(publicProfile); }
       if (!["demo", "sam_demo"].includes(username)) fail(ERROR_CODES.PROFILE_NOT_FOUND, 404);
       const publicData: PublicProfile = {
         id: profile.id, username: profile.username, firstName: profile.firstName, lastName: profile.lastName,
@@ -64,7 +67,7 @@ export function createMockProfileService(delay = 250): ProfileService {
       return success(publicData);
     },
     async tags(token) { await wait(token); return success(catalog); },
-    async image(id, token) { await wait(token); return images.get(id) ?? fail(ERROR_CODES.NOT_FOUND, 404); },
+    async image(id, token) { await wait(token); return images.get(id) ?? discoveryPicture(id) ?? fail(ERROR_CODES.NOT_FOUND, 404); },
     async upload(file, token) {
       await wait(token);
       if (profile.pictures.length >= 5) fail(ERROR_CODES.UPLOAD_LIMIT_REACHED, 409);

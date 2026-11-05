@@ -25,6 +25,7 @@ export function unwrap<T>(response: ApiResponse<T>, status = 400): T {
 export interface RequestOptions<T> {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
+  query?: URLSearchParams;
   responseType?: "image";
   accessToken?: string;
   status: number;
@@ -48,6 +49,7 @@ export function createApiClient(
     } catch {
       throw new TransportError("configuration");
     }
+    if (options.query) url.search = options.query.toString();
     const multipart = options.body instanceof FormData;
     const headers = new Headers({ Accept: options.responseType === "image" ? "image/jpeg, image/png, image/webp" : "application/json" });
     if (options.body !== undefined && !multipart) headers.set("Content-Type", "application/json");
