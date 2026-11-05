@@ -14,6 +14,7 @@ import PublicProfilePage from "./pages/PublicProfilePage";
 import AccountPage from "./pages/AccountPage";
 import VerifyEmailChangePage from "./pages/VerifyEmailChangePage";
 import LocationPage from "./pages/LocationPage";
+import DiscoveryPage from "./pages/DiscoveryPage";
 
 export default function App({ initialLink }: { initialLink: { path: string; token: string | null } }) {
   return (
@@ -32,6 +33,8 @@ export default function App({ initialLink }: { initialLink: { path: string; toke
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
+          <Route path="/browse" element={<DiscoveryPage key="browse" mode="suggestions" />} />
+          <Route path="/search" element={<DiscoveryPage key="search" mode="search" />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/edit" element={<EditProfilePage />} />
           <Route path="/profile/location" element={<LocationPage />} />
