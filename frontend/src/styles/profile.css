@@ -42,6 +42,19 @@
 .presence::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 8px; }
 .relationship-list { color: var(--muted); padding-left: 20px; line-height: 1.8; }
 .editor-width { max-width: 740px; margin: auto; }
+.app-header nav { flex-wrap: wrap; gap: 8px 20px; }
+.interaction-actions { margin-top: 24px; padding: 24px 0; border-top: 1px solid var(--line); }
+.interaction-confirm { max-width: 640px; margin-top: 24px; padding: 24px 0; border-top: 1px solid var(--line); }
+.interaction-confirm textarea { width: 100%; }
+.relationship-cards { list-style: none; padding: 0; display: grid; gap: 20px; }
+.relationship-cards > li { display: flex; gap: 24px; padding: 20px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.relationship-cards > li > div:last-child { min-width: 0; overflow-wrap: anywhere; }
+.relationship-photo { flex: 0 0 100px; width: 100px; height: 120px; overflow: hidden; background: #f0edf5; border-radius: 6px; }
+.relationship-photo img { width: 100%; height: 100%; object-fit: cover; }
+.relationship-cards p { margin: 8px 0; }
+.relationship-cards time { font-size: 13px; color: var(--muted); }
+.relationship-pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 16px; margin: 28px 0; }
+@media (max-width: 600px) { .app-header { flex-wrap: wrap; } .app-header nav { order: 3; width: 100%; } .relationship-photo { flex-basis: 72px; width: 72px; height: 90px; } .relationship-cards > li { gap: 14px; } }
 .location-methods { margin: 16px 0 28px; gap: 12px 28px; }
 .location-methods label { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
 .location-methods input { width: 18px; height: 18px; margin: 0; accent-color: var(--green); }
