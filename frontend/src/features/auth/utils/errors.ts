@@ -3,6 +3,12 @@ import type { ErrorCode } from "@matcha/shared";
 import { ApiRequestError, TransportError } from "../../../services/api/client";
 
 const messages: Partial<Record<ErrorCode, string>> = {
+  [ERROR_CODES.CANNOT_LIKE_SELF]: "You cannot like your own profile.",
+  [ERROR_CODES.ALREADY_LIKED]: "You already like this profile. Refresh to see its current state.",
+  [ERROR_CODES.LIKE_NOT_FOUND]: "This like is no longer present. Refresh the profile.",
+  [ERROR_CODES.USER_BLOCKED]: "This interaction is unavailable.",
+  [ERROR_CODES.PROFILE_INCOMPLETE]: "Both profiles must be complete before a like can be sent.",
+  [ERROR_CODES.PROFILE_PICTURE_REQUIRED]: "Add a main profile photo before liking someone.",
   [ERROR_CODES.INVALID_CURRENT_PASSWORD]: "Your current password is incorrect. Please try again.",
   [ERROR_CODES.INVALID_EMAIL_CHANGE_TOKEN]: "This email-change link is invalid or has expired. Request another change from account settings.",
   [ERROR_CODES.PROFILE_NOT_FOUND]: "This profile is unavailable. It may not exist or may not be accessible to you.",
