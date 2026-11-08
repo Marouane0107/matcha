@@ -4,17 +4,15 @@ const SALT_ROUNDS = 10;
 
 /**
  * Checks if a password is strong.
- * Enforces a minimum of 8 characters, at least one uppercase letter,
- * one lowercase letter, one number, and one special character.
+ * Enforces 12..128 Unicode code points with at least one letter and one number,
+ * matching the shared frontend validation and the Phase 0 password policy.
  */
 export const isPasswordStrong = (password) => {
-  const minLength = 8;
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasLowercase = /[a-z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  const length = [...password].length;
+  const hasLetter = /\p{L}/u.test(password);
+  const hasNumber = /\p{N}/u.test(password);
 
-  return password.length >= minLength && hasUppercase && hasLowercase && hasNumber && hasSpecialChar;
+  return length >= 12 && length <= 128 && hasLetter && hasNumber;
 };
 
 export const hashPassword = async (password) => {

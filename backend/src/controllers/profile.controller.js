@@ -15,6 +15,35 @@ const VALID_GENDERS = ['man', 'woman', 'non_binary'];
 // Allowed sexual preference values per the shared contract
 const VALID_SEXUAL_PREFERENCES = ['men', 'women', 'everyone'];
 
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+function toDateOnly(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function toLocation(row) {
+  if (row.latitude == null || row.longitude == null) return null;
+  return {
+    city: typeof row.location_string === "string" ? row.location_string : "",
+    neighborhood: null,
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    mode: "manual",
+  };
+}
+
+function toPictures(photos) {
+  return photos.map((photo, index) => ({
+    id: photo.id,
+    url: photo.url,
+    isMain: Boolean(photo.is_profile_picture),
+    position: index + 1,
+  }));
+}
+
 /**
  * Helper to compute whether a user's profile is complete:
  * Requires gender, sexual_preference, biography, at least one tag, and at least one photo.
@@ -38,6 +67,7 @@ export const fetchFullProfile = async (clientOrPool, userId) => {
       u.id AS user_id,
       u.username,
       u.email,
+      u.last_seen,
       p.id AS profile_id,
       p.first_name,
       p.last_name,
@@ -84,28 +114,25 @@ export const fetchFullProfile = async (clientOrPool, userId) => {
   const photos = photosResult.rows;
 
   const profileComplete = calculateProfileComplete(row, tags, photos);
+  const lastSeen = row.last_seen ? new Date(row.last_seen) : null;
 
   return {
-    userId: row.user_id,
+    id: row.user_id,
     username: row.username,
-    email: row.email,
-    profileId: row.profile_id,
-    firstName: row.first_name,
-    lastName: row.last_name,
-    birthDate: row.birth_date,
-    dateOfBirth: row.birth_date,
+    firstName: row.first_name || "",
+    lastName: row.last_name || "",
     gender: row.gender,
-    sexualPreference: row.sexual_preference,
-    biography: row.biography,
-    fameRating: row.fame_rating || 0.0,
-    latitude: row.latitude,
-    longitude: row.longitude,
-    locationString: row.location_string,
-    tags,
-    photos,
+    sexualPreference: row.sexual_preference || "everyone",
+    bio: row.biography || "",
+    fameRating: Number(row.fame_rating) || 0,
+    tags: tags.map(tag => ({ id: tag.id, name: tag.name })),
+    pictures: toPictures(photos),
+    isOnline: lastSeen ? Date.now() - lastSeen.getTime() < ONLINE_WINDOW_MS : false,
+    lastSeen: lastSeen ? lastSeen.toISOString() : null,
+    email: row.email,
+    dateOfBirth: toDateOnly(row.birth_date),
+    location: toLocation(row),
     profileComplete,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
   };
 };
 
@@ -122,7 +149,7 @@ export const getMyProfile = async (req, res, next) => {
       return res.status(404).json(apiError(ERROR_CODES.PROFILE_NOT_FOUND, 'User profile not found'));
     }
 
-    res.status(200).json(apiSuccess({ profile }));
+    res.status(200).json(apiSuccess(profile));
   } catch (error) {
     next(error);
   }
@@ -146,7 +173,9 @@ export const updateMyProfile = async (req, res, next) => {
       sexual_preference,
       biography,
       bio,
-      tags
+      dateOfBirth,
+      date_of_birth,
+      tagIds
     } = req.body;
 
     const newFirstName = firstName !== undefined ? firstName : first_name;
@@ -154,6 +183,8 @@ export const updateMyProfile = async (req, res, next) => {
     const newGender = gender;
     const newSexualPreference = sexualPreference !== undefined ? sexualPreference : sexual_preference;
     const newBiography = biography !== undefined ? biography : bio;
+    const newDateOfBirth = dateOfBirth !== undefined ? dateOfBirth : date_of_birth;
+    const newTagIds = tagIds;
 
     // Field validations
     if (newFirstName !== undefined && (typeof newFirstName !== 'string' || newFirstName.trim().length === 0 || newFirstName.length > 50)) {
@@ -179,8 +210,25 @@ export const updateMyProfile = async (req, res, next) => {
         return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Biography must not exceed 1000 characters'));
       }
     }
-    if (tags !== undefined && !Array.isArray(tags)) {
-      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Tags must be an array of tag names'));
+    if (newDateOfBirth !== undefined && newDateOfBirth !== null && newDateOfBirth !== '') {
+      const validFormat = /^\d{4}-\d{2}-\d{2}$/.test(String(newDateOfBirth));
+      const parsed = new Date(`${newDateOfBirth}T00:00:00Z`);
+      let age = null;
+      if (validFormat && !Number.isNaN(parsed.getTime())) {
+        const now = new Date();
+        const birth = new Date(`${newDateOfBirth}T00:00:00Z`);
+        age = now.getUTCFullYear() - birth.getUTCFullYear() - Number(now.getUTCMonth() < birth.getUTCMonth() || (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate()));
+      }
+      if (age === null || age < 18 || age > 120) {
+        return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Birth date must be a valid date for an age between 18 and 120'));
+      }
+    }
+    if (newTagIds !== undefined) {
+      const invalidTagIds = !Array.isArray(newTagIds) || newTagIds.length > 10 || new Set(newTagIds).size !== newTagIds.length ||
+        newTagIds.some(id => typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+      if (invalidTagIds) {
+        return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'tagIds must be up to 10 distinct tag UUIDs'));
+      }
     }
 
     await client.query('BEGIN');
@@ -220,6 +268,10 @@ export const updateMyProfile = async (req, res, next) => {
       updates.push(`biography = $${paramIndex++}`);
       values.push(newBiography !== null ? newBiography.trim() : null);
     }
+    if (newDateOfBirth !== undefined) {
+      updates.push(`birth_date = $${paramIndex++}`);
+      values.push(newDateOfBirth === null || newDateOfBirth === '' ? null : newDateOfBirth);
+    }
 
     if (updates.length > 0) {
       updates.push(`updated_at = CURRENT_TIMESTAMP`);
@@ -232,50 +284,14 @@ export const updateMyProfile = async (req, res, next) => {
       await client.query(updateQuery, values);
     }
 
-    // Tag synchronization flow
-    if (tags !== undefined) {
-      // Sanitize and deduplicate tag names
-      const tagMap = new Map();
-      for (const rawTag of tags) {
-        const rawName = typeof rawTag === 'string' ? rawTag : rawTag?.name;
-        if (!rawName || typeof rawName !== 'string') continue;
-        const cleaned = rawName.trim().replace(/^#+/, '').toLowerCase();
-        // Validation: 2-30 characters alphanumeric, dashes, underscores
-        if (/^[a-z0-9_-]{2,30}$/.test(cleaned)) {
-          tagMap.set(cleaned, true);
-        }
-      }
-
-      const sanitizedTagNames = Array.from(tagMap.keys()).slice(0, 20); // max 20 tags
-      const tagIds = [];
-
-      for (const tagName of sanitizedTagNames) {
-        const tagResult = await client.query(
-          `INSERT INTO tags (name) 
-           VALUES ($1) 
-           ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name 
-           RETURNING id`,
-          [tagName]
-        );
-        tagIds.push(tagResult.rows[0].id);
-      }
-
-      if (tagIds.length === 0) {
-        // Clear all user tags if empty list provided
-        await client.query('DELETE FROM user_tags WHERE user_id = $1', [userId]);
-      } else {
-        // Delete tags not present in new list
+    // Tag synchronization flow — replace the user's tags with the provided tag IDs.
+    if (newTagIds !== undefined) {
+      await client.query('DELETE FROM user_tags WHERE user_id = $1', [userId]);
+      for (const tagId of newTagIds) {
         await client.query(
-          'DELETE FROM user_tags WHERE user_id = $1 AND NOT (tag_id = ANY($2::uuid[]))',
-          [userId, tagIds]
+          'INSERT INTO user_tags (user_id, tag_id) VALUES ($1, $2) ON CONFLICT (user_id, tag_id) DO NOTHING',
+          [userId, tagId]
         );
-        // Insert missing associations
-        for (const tagId of tagIds) {
-          await client.query(
-            'INSERT INTO user_tags (user_id, tag_id) VALUES ($1, $2) ON CONFLICT (user_id, tag_id) DO NOTHING',
-            [userId, tagId]
-          );
-        }
       }
     }
 
@@ -284,10 +300,7 @@ export const updateMyProfile = async (req, res, next) => {
     // Fetch and return the fresh profile
     const updatedProfile = await fetchFullProfile(pool, userId);
 
-    res.status(200).json(apiSuccess({
-      message: 'Profile updated successfully',
-      profile: updatedProfile
-    }));
+    res.status(200).json(apiSuccess(updatedProfile));
   } catch (error) {
     await client.query('ROLLBACK');
     next(error);
@@ -315,7 +328,7 @@ export const getAllTags = async (req, res, next) => {
 
     const result = await pool.query(query, values);
 
-    res.status(200).json(apiSuccess({ tags: result.rows }));
+    res.status(200).json(apiSuccess(result.rows.map(tag => ({ id: tag.id, name: tag.name }))));
   } catch (error) {
     next(error);
   }
@@ -386,11 +399,7 @@ export const uploadPhoto = async (req, res, next) => {
     // Fetch updated profile to provide the fresh profileComplete status
     const updatedProfile = await fetchFullProfile(pool, userId);
 
-    res.status(201).json(apiSuccess({
-      message: 'Photo uploaded successfully',
-      photo: uploadedPhoto,
-      profile: updatedProfile
-    }));
+    res.status(201).json(apiSuccess({ pictures: updatedProfile.pictures }));
   } catch (error) {
     next(error);
   }
@@ -450,10 +459,7 @@ export const deletePhoto = async (req, res, next) => {
 
     const updatedProfile = await fetchFullProfile(pool, userId);
 
-    res.status(200).json(apiSuccess({
-      message: 'Photo deleted successfully',
-      profile: updatedProfile
-    }));
+    res.status(200).json(apiSuccess({ pictures: updatedProfile.pictures }));
   } catch (error) {
     await client.query('ROLLBACK');
     next(error);
@@ -503,11 +509,7 @@ export const setProfilePicture = async (req, res, next) => {
 
     const updatedProfile = await fetchFullProfile(pool, userId);
 
-    res.status(200).json(apiSuccess({
-      message: 'Profile picture updated successfully',
-      photo: updateResult.rows[0],
-      profile: updatedProfile
-    }));
+    res.status(200).json(apiSuccess({ pictures: updatedProfile.pictures }));
   } catch (error) {
     await client.query('ROLLBACK');
     next(error);

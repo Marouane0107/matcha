@@ -8,7 +8,7 @@ const getSecret = () => {
   return secret;
 };
 
-const DEFAULT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const DEFAULT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 
 export const generateToken = (payload, expiresIn = DEFAULT_EXPIRES_IN) => {
   return jwt.sign(payload, getSecret(), { expiresIn });
@@ -25,7 +25,7 @@ export const verifyToken = (token) => {
 export const getExpiresInSeconds = () => {
   const raw = DEFAULT_EXPIRES_IN;
   const match = raw.match(/^(\d+)([smhd]?)$/);
-  if (!match) return 604800; // fallback: 7 days
+  if (!match) return 900; // fallback: 15 minutes
 
   const value = parseInt(match[1], 10);
   const unit = match[2] || 's';

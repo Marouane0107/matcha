@@ -35,7 +35,8 @@ const upload = multer({
 // Middleware supporting either 'photo' or 'image' field names
 const multerFields = upload.fields([
   { name: 'photo', maxCount: 1 },
-  { name: 'image', maxCount: 1 }
+  { name: 'image', maxCount: 1 },
+  { name: 'picture', maxCount: 1 }
 ]);
 
 export const uploadPhotoMiddleware = (req, res, next) => {
@@ -61,7 +62,7 @@ export const uploadPhotoMiddleware = (req, res, next) => {
 
     // Normalize file reference to req.file
     if (req.files) {
-      req.file = req.files.photo?.[0] || req.files.image?.[0] || null;
+      req.file = req.files.photo?.[0] || req.files.image?.[0] || req.files.picture?.[0] || null;
     }
 
     if (!req.file) {

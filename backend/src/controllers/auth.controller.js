@@ -14,7 +14,7 @@ export const register = async (req, res, next) => {
     }
 
     if (!isPasswordStrong(password)) {
-      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Password is too weak. Must be at least 8 characters with uppercase, lowercase, number, and special character.'));
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Password must be 12 to 128 characters with at least one letter and one number.'));
     }
 
     // Check for existing email or username separately to return specific error codes
@@ -166,7 +166,7 @@ export const login = async (req, res, next) => {
 
 export const logout = async (req, res, next) => {
   try {
-    res.status(200).json(apiSuccess({ message: 'Logged out successfully' }));
+    res.status(204).end();
   } catch (error) {
     next(error);
   }
