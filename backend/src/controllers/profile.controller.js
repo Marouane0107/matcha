@@ -358,9 +358,14 @@ export const uploadPhoto = async (req, res, next) => {
       return res.status(400).json(apiError(ERROR_CODES.UPLOAD_LIMIT_REACHED, 'A user can have a maximum of 5 photos. Please delete a photo before uploading a new one.'));
     }
 
-    // Decode, resize, and convert to WebP using Sharp
+    // Decode, resize, and convert to WebP using Sharp.
+    // Verify the actual decoded format so a renamed non-image cannot bypass checks.
     let processedBuffer;
     try {
+      const metadata = await sharp(req.file.buffer).metadata();
+      if (!['jpeg', 'png', 'webp'].includes(metadata.format)) {
+        return res.status(400).json(apiError(ERROR_CODES.UPLOAD_INVALID_TYPE, 'Invalid image format.'));
+      }
       processedBuffer = await sharp(req.file.buffer)
         .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
         .toFormat('webp', { quality: 85 })

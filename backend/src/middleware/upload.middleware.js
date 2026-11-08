@@ -1,5 +1,6 @@
 import multer from 'multer';
 import path from 'path';
+import { apiError, ERROR_CODES } from '../config/shared.js';
 
 // Allowed MIME types and extensions
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -44,20 +45,11 @@ export const uploadPhotoMiddleware = (req, res, next) => {
     if (err) {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({
-            status: 'error',
-            message: 'File size exceeds the 5MB limit.'
-          });
+          return res.status(400).json(apiError(ERROR_CODES.UPLOAD_TOO_LARGE, 'File size exceeds the 5MB limit.'));
         }
-        return res.status(400).json({
-          status: 'error',
-          message: `Upload error: ${err.message}`
-        });
+        return res.status(400).json(apiError(ERROR_CODES.UPLOAD_INVALID_TYPE, 'Invalid file upload.'));
       }
-      return res.status(err.statusCode || 400).json({
-        status: 'error',
-        message: err.message || 'File upload failed.'
-      });
+      return res.status(400).json(apiError(ERROR_CODES.UPLOAD_INVALID_TYPE, 'Invalid file type. Only JPEG, PNG, and WebP images are allowed.'));
     }
 
     // Normalize file reference to req.file
@@ -66,10 +58,7 @@ export const uploadPhotoMiddleware = (req, res, next) => {
     }
 
     if (!req.file) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'No image file provided. Please attach a file under the "photo" or "image" field.'
-      });
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'No image file provided.'));
     }
 
     next();

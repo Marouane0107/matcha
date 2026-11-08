@@ -1,5 +1,9 @@
 import { pool } from '../config/db.js';
-import { apiSuccess, apiError, ERROR_CODES } from '../config/shared.js';
+import { apiSuccess, apiError, ERROR_CODES, SOCKET_EVENTS } from '../config/shared.js';
+import { fetchFullProfile } from './profile.controller.js';
+import { userProfileToPublic } from '../utils/profile-serialize.js';
+import { isUserOnline } from '../sockets/presence.js';
+import { createNotification, emitNotification, emitToUser } from '../utils/notification.util.js';
 
 const VALID_REPORT_REASONS = ['spam', 'harassment', 'fake_account', 'other'];
 
@@ -7,6 +11,25 @@ const VALID_REPORT_REASONS = ['spam', 'harassment', 'fake_account', 'other'];
 const ONLINE_WINDOW = "INTERVAL '5 minutes'";
 // Duplicate profile views within this window are ignored.
 const VISIT_DEDUP_WINDOW = "INTERVAL '60 seconds'";
+
+async function emitConnectionNew(userA, userB) {
+  const [profileA, profileB] = await Promise.all([fetchFullProfile(pool, userA), fetchFullProfile(pool, userB)]);
+  if (!profileA || !profileB) return;
+  const connectedAt = new Date().toISOString();
+  emitToUser(userA, SOCKET_EVENTS.CONNECTION_NEW, {
+    user: userProfileToPublic(profileB, { likedByMe: true, hasLikedMe: true, isOnline: isUserOnline(userB) }),
+    connectedAt,
+  });
+  emitToUser(userB, SOCKET_EVENTS.CONNECTION_NEW, {
+    user: userProfileToPublic(profileA, { likedByMe: true, hasLikedMe: true, isOnline: isUserOnline(userA) }),
+    connectedAt,
+  });
+}
+
+function emitConnectionRemoved(userA, userB) {
+  emitToUser(userA, SOCKET_EVENTS.CONNECTION_REMOVED, { userId: userB });
+  emitToUser(userB, SOCKET_EVENTS.CONNECTION_REMOVED, { userId: userA });
+}
 
 /**
  * GET /api/profiles/:id
@@ -71,7 +94,7 @@ export const getPublicProfile = async (req, res, next) => {
     const canChat = isConnected && !isBlocked;
 
     // Record the visit — skip self-views and rapid duplicate views.
-    await pool.query(
+    const visitResult = await pool.query(
       `
       INSERT INTO visits (visitor_id, visited_id)
       SELECT $1::uuid, $2::uuid
@@ -81,9 +104,15 @@ export const getPublicProfile = async (req, res, next) => {
           WHERE visitor_id = $1::uuid AND visited_id = $2::uuid
             AND created_at > NOW() - ${VISIT_DEDUP_WINDOW}
         )
+      RETURNING id
       `,
       [userId, targetId]
     );
+
+    if (visitResult.rows.length > 0) {
+      const viewNotification = await createNotification(pool, { userId: targetId, actorId: userId, type: 'PROFILE_VIEW' });
+      emitNotification(targetId, viewNotification);
+    }
 
     res.status(200).json(apiSuccess({
       profile: {
@@ -165,12 +194,22 @@ export const likeProfile = async (req, res, next) => {
       'INSERT INTO likes (liker_id, liked_id) VALUES ($1::uuid, $2::uuid)',
       [userId, targetId]
     );
-    await client.query(
-      `INSERT INTO notifications (user_id, sender_id, type, content)
-       VALUES ($1::uuid, $2::uuid, $3, $4)`,
-      [targetId, userId, isMatch ? 'CONNECTION' : 'LIKE', isMatch ? 'You have a new match!' : 'Someone liked your profile']
-    );
+
+    const likeNotifications = [];
+    if (isMatch) {
+      likeNotifications.push({ userId: targetId, notification: await createNotification(client, { userId: targetId, actorId: userId, type: 'CONNECTION' }) });
+      likeNotifications.push({ userId, notification: await createNotification(client, { userId, actorId: targetId, type: 'CONNECTION' }) });
+    } else {
+      likeNotifications.push({ userId: targetId, notification: await createNotification(client, { userId: targetId, actorId: userId, type: 'LIKE' }) });
+    }
     await client.query('COMMIT');
+
+    for (const entry of likeNotifications) {
+      emitNotification(entry.userId, entry.notification);
+    }
+    if (isMatch) {
+      await emitConnectionNew(userId, targetId);
+    }
 
     res.status(201).json(apiSuccess({
       likedByMe: true,
@@ -218,15 +257,17 @@ export const unlikeProfile = async (req, res, next) => {
       return res.status(404).json(apiError(ERROR_CODES.LIKE_NOT_FOUND, 'You have not liked this user'));
     }
 
+    let unlikeNotification = null;
     if (wasConnected) {
-      await client.query(
-        `INSERT INTO notifications (user_id, sender_id, type, content)
-         VALUES ($1::uuid, $2::uuid, 'UNLIKE', 'A connection was removed')`,
-        [targetId, userId]
-      );
+      unlikeNotification = await createNotification(client, { userId: targetId, actorId: userId, type: 'UNLIKE' });
     }
 
     await client.query('COMMIT');
+
+    if (wasConnected) {
+      emitNotification(targetId, unlikeNotification);
+      emitConnectionRemoved(userId, targetId);
+    }
 
     res.status(200).json(apiSuccess({ likedByMe: false, hasLikedMe: wasConnected, isConnected: false }));
   } catch (error) {

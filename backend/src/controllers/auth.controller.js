@@ -1,6 +1,7 @@
 import { pool } from '../config/db.js';
 import crypto from 'crypto';
 import { hashPassword, isPasswordStrong, verifyPassword } from '../utils/password.util.js';
+import { isValidEmail, isValidUsername, isValidName } from '../utils/validation.util.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email.util.js';
 import { generateToken, getExpiresInSeconds } from '../utils/jwt.util.js';
 import { apiSuccess, apiError, ERROR_CODES } from '../config/shared.js';
@@ -11,6 +12,16 @@ export const register = async (req, res, next) => {
 
     if (!username || !email || !firstName || !lastName || !password) {
       return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'All fields are required'));
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Enter a valid email address'));
+    }
+    if (!isValidUsername(username)) {
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Username must be 3-30 lowercase letters, numbers or underscores, starting with a letter'));
+    }
+    if (!isValidName(firstName) || !isValidName(lastName)) {
+      return res.status(400).json(apiError(ERROR_CODES.VALIDATION_ERROR, 'Names must be between 1 and 50 characters'));
     }
 
     if (!isPasswordStrong(password)) {

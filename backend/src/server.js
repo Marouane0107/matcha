@@ -11,6 +11,9 @@ import authRoutes from './routes/auth.routes.js';
 import profileRoutes, { tagRouter } from './routes/profile.routes.js';
 import browseRoutes from './routes/browse.routes.js';
 import interactionRoutes, { interactionsRouter } from './routes/interaction.routes.js';
+import chatRoutes from './routes/chat.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
+import { initSocketServer } from './sockets/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,13 +32,30 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const io = new Server(server, {
   cors: {
     origin: CORS_ORIGIN,
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
+    credentials: false,
   }
 });
 
 // Middleware
-app.use(cors({ origin: CORS_ORIGIN }));
+app.use(cors({
+  origin: CORS_ORIGIN,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+  credentials: false,
+}));
 app.use(express.json());
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -53,6 +73,8 @@ app.use('/api/profiles', browseRoutes);       // plural — suggestions & search
 app.use('/api/profiles', interactionRoutes);  // plural — public profile, like/block/report
 app.use('/api/interactions', interactionsRouter);
 app.use('/api/tags', tagRouter);
+app.use('/api/conversations', chatRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res, next) => {
@@ -68,27 +90,14 @@ app.get('/health', async (req, res, next) => {
   }
 });
 
-// Socket.io events
-io.on('connection', (socket) => {
-  console.log(`[Socket] connected: ${socket.id}`);
+// Socket.io — authenticated realtime chat, presence, and notifications
+initSocketServer(io);
 
-  socket.on('disconnect', () => {
-    console.log(`[Socket] disconnected: ${socket.id}`);
-  });
-});
-
-// Global error-handling middleware — uses shared ApiFailure envelope
+// Global error-handling middleware — logs details server-side only; never
+// exposes raw SQL, stack traces, or secrets to clients.
 app.use((err, req, res, next) => {
-  console.error('[Error]:', err.message || err);
-
-  const statusCode = err.statusCode || 500;
-  const code = err.errorCode || ERROR_CODES.INTERNAL_ERROR;
-  // Sanitize error message in production for 500 errors
-  const message = process.env.NODE_ENV === 'production' && statusCode === 500
-    ? 'Internal Server Error'
-    : err.message || 'Internal Server Error';
-
-  res.status(statusCode).json(apiError(code, message));
+  console.error('[Error]:', err);
+  res.status(500).json(apiError(ERROR_CODES.INTERNAL_ERROR, 'Internal Server Error'));
 });
 
 // Start the server
