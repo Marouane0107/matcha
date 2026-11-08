@@ -2,11 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from '../src/config/db.js';
+import { assertDevOrTest } from '../src/config/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export async function resetDatabase() {
+  assertDevOrTest('Database reset');
   console.log('🔄 Resetting database schema...');
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schemaSql = fs.readFileSync(schemaPath, 'utf8');
@@ -20,6 +22,7 @@ export async function resetDatabase() {
       DROP TABLE IF EXISTS tokens CASCADE;
       DROP TABLE IF EXISTS notifications CASCADE;
       DROP TABLE IF EXISTS messages CASCADE;
+      DROP TABLE IF EXISTS reports CASCADE;
       DROP TABLE IF EXISTS blocks CASCADE;
       DROP TABLE IF EXISTS visits CASCADE;
       DROP TABLE IF EXISTS likes CASCADE;
