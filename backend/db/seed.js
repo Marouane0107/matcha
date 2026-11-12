@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { faker } from '@faker-js/faker';
 import { pool } from '../src/config/db.js';
+import { assertDevOrTest } from '../src/config/env.js';
 
 // Pre-define tags pool
 const TAGS_POOL = [
@@ -23,6 +24,7 @@ const SECONDARY_CITIES = [
 ];
 
 export async function seedDatabase(targetCount = 520) {
+  assertDevOrTest('Database seeding');
   console.log(`🌱 Starting deterministic seed with ${targetCount} users (Seed: 42)...`);
   const startTime = Date.now();
 
@@ -44,9 +46,10 @@ export async function seedDatabase(targetCount = 520) {
       tagIds.push({ id: res.rows[0].id, name: tagName });
     }
 
-    // 2. Hash default password once for speed
+    // 2. Hash the shared dev-only default password once for speed
     console.log('🔑 Hashing default password...');
-    const defaultPasswordHash = await bcrypt.hash('Matcha123!', 10);
+    const defaultPassword = process.env.SEED_DEFAULT_PASSWORD || 'Matcha123!';
+    const defaultPasswordHash = await bcrypt.hash(defaultPassword, 10);
 
     // 3. Generate Users & Profiles
     console.log(`👥 Generating ${targetCount} users and profiles...`);
@@ -59,8 +62,8 @@ export async function seedDatabase(targetCount = 520) {
       passwordHash: defaultPasswordHash,
       firstName: 'Alex',
       lastName: 'Morgan',
-      gender: 'male',
-      sexualPreference: 'bisexual',
+      gender: 'man',
+      sexualPreference: 'everyone',
       birthDate: '1996-06-15', // 30 years old
       biography: 'Lead tester and developer. Love specialty coffee, traveling the world, and clean code.',
       latitude: 48.8566, // Paris Center
@@ -68,18 +71,23 @@ export async function seedDatabase(targetCount = 520) {
       locationString: 'Paris, France'
     });
 
-    const genders = ['male', 'female', 'other'];
-    const sexualPreferences = ['heterosexual', 'homosexual', 'bisexual'];
+    // Phase 0 shared contract enums: Gender = man|woman|non_binary, SexualPreference = men|women|everyone
+    const genders = ['man', 'woman', 'non_binary'];
+    const sexualPreferences = ['men', 'women', 'everyone'];
 
     for (let i = 1; i < targetCount; i++) {
       // Deterministic distribution
       const genderRoll = faker.number.float({ min: 0, max: 1 });
-      const gender = genderRoll < 0.46 ? 'male' : genderRoll < 0.92 ? 'female' : 'other';
+      const gender = genderRoll < 0.46 ? 'man' : genderRoll < 0.92 ? 'woman' : 'non_binary';
 
       const prefRoll = faker.number.float({ min: 0, max: 1 });
-      const sexualPreference = prefRoll < 0.65 ? 'heterosexual' : prefRoll < 0.85 ? 'homosexual' : 'bisexual';
+      const sexualPreference = prefRoll < 0.65 ? 'men' : prefRoll < 0.85 ? 'women' : 'everyone';
 
-      const firstName = gender === 'female' ? faker.person.firstName('female') : faker.person.firstName('male');
+      const firstName = gender === 'woman'
+        ? faker.person.firstName('female')
+        : gender === 'man'
+          ? faker.person.firstName('male')
+          : faker.person.firstName();
       const lastName = faker.person.lastName();
       const username = `${firstName.toLowerCase()}_${lastName.toLowerCase()}_${i}`.replace(/[^a-z0-9_]/g, '');
       const email = `${username}@example.com`;
@@ -266,32 +274,25 @@ export async function seedDatabase(targetCount = 520) {
       );
     }
 
-    // 7. Update Fame Ratings based on incoming likes
+    // 7. Update fame ratings: fame = min(100, incoming like count) per Phase 0 contract
     console.log('⭐ Computing and updating fame ratings...');
     await client.query(`
       WITH like_counts AS (
-        SELECT liked_id, COUNT(*) as cnt
+        SELECT liked_id, COUNT(*) AS cnt
         FROM likes
         GROUP BY liked_id
       )
       UPDATE profiles p
-      SET fame_rating = LEAST(100.0, ROUND(COALESCE(lc.cnt * 12.5, 0.0)::numeric, 1))
+      SET fame_rating = LEAST(100, COALESCE(lc.cnt, 0))
       FROM like_counts lc
       WHERE p.user_id = lc.liked_id;
-    `);
-
-    // Give remaining profiles baseline random fame between 5 and 40
-    await client.query(`
-      UPDATE profiles
-      SET fame_rating = ROUND((RANDOM() * 35 + 5)::numeric, 1)
-      WHERE fame_rating = 0.0;
     `);
 
     await client.query('COMMIT');
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`✅ Deterministic seed complete in ${duration}s!`);
     console.log(`👤 Seeded users count: ${userRecords.length}`);
-    console.log(`🔑 Tester account: tester@matcha.com / Matcha123! (Username: matcha_tester)`);
+    console.log(`🔑 Tester account: tester@matcha.com / ${defaultPassword} (Username: matcha_tester) — development-only`);
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Error during seeding:', err);

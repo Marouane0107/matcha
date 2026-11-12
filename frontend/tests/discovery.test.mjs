@@ -7,6 +7,7 @@ import { createApiClient, ApiRequestError, TransportError } from "../src/service
 import { createRealDiscoveryService, serializeSearch, isSearchPage } from "../src/features/discovery/service.ts";
 import { createMockDiscoveryService } from "../src/features/discovery/mock.ts";
 import { createMockProfileService } from "../src/features/profile/mock.ts";
+import { createMockInteractionBundle } from "../src/features/interactions/mock.ts";
 import { searchErrors } from "../src/features/discovery/validation.ts";
 
 const token = "synthetic-discovery-token";
@@ -21,6 +22,7 @@ const { createMemoryRouter, RouterProvider } = await import("react-router-dom");
 const { AuthProvider } = await import("../src/features/auth/AuthProvider.tsx");
 const { ProfileProvider } = await import("../src/features/profile/ProfileProvider.tsx");
 const { DiscoveryProvider } = await import("../src/features/discovery/DiscoveryProvider.tsx");
+const { InteractionProvider } = await import("../src/features/interactions/InteractionProvider.tsx");
 const { default: DiscoveryPage } = await import("../src/pages/DiscoveryPage.tsx");
 const { default: PublicProfilePage } = await import("../src/pages/PublicProfilePage.tsx");
 const snapshot = { accessToken: token };
@@ -37,6 +39,7 @@ const change = (selector, value) => act(async () => {
 });
 
 async function mount(context, service = mock, mode = "suggestions", profileService = profiles) {
+  const interactions = createMockInteractionBundle(profileService, "eligible", 0);
   const router = createMemoryRouter([
     { path: "/browse", element: createElement(DiscoveryPage, { mode }) },
     { path: "/profiles/:username", element: createElement(PublicProfilePage) },
@@ -46,7 +49,7 @@ async function mount(context, service = mock, mode = "suggestions", profileServi
   const originalRevoke = URL.revokeObjectURL;
   URL.createObjectURL = () => "blob:synthetic-image";
   URL.revokeObjectURL = () => {};
-  await act(async () => root.render(createElement(AuthProvider, { session, service: {} }, createElement(ProfileProvider, { service: profileService }, createElement(DiscoveryProvider, { service }, createElement(RouterProvider, { router }))))));
+  await act(async () => root.render(createElement(AuthProvider, { session, service: {} }, createElement(ProfileProvider, { service: interactions.profiles }, createElement(InteractionProvider, { service: interactions.service }, createElement(DiscoveryProvider, { service }, createElement(RouterProvider, { router })))))));
   context.after(async () => { await act(async () => root.unmount()); router.dispose(); URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke; });
   return router;
 }
@@ -137,6 +140,31 @@ test("suggestions load, render privacy-safe cards, paginate and navigate to exis
   assert(router.state.location.pathname.startsWith("/profiles/browse_demo_"));
   await act(flush);
   assert(document.querySelector("h1").textContent.includes("Maya"));
+});
+
+test("Browse profile fixtures retain Like/Unlike and Block/Unblock state through merged providers", async context => {
+  const router = await mount(context);
+  await act(async () => { await flush(); await flush(); });
+  await click(document.querySelector("article h2 a"));
+  await act(flush);
+  await click(button("Like"));
+  assert(button("Unlike"));
+  assert(text().includes("Profile liked."));
+  await act(async () => router.navigate("/browse"));
+  await act(async () => { await flush(); await flush(); });
+  await click(document.querySelector("article h2 a"));
+  await act(flush);
+  assert(button("Unlike"));
+  await click(button("Unlike"));
+  assert(button("Like"));
+  await click(button("Block"));
+  await click(button("Confirm block"));
+  assert(text().includes("Profile blocked"));
+  assert(!document.querySelector(".profile-columns"));
+  await click(button("Unblock"));
+  await act(flush);
+  assert(button("Like"));
+  assert(text().includes("No like received."));
 });
 
 test("search validates before requesting, submits sorting and resets page on filter changes", async context => {

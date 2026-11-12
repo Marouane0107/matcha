@@ -60,20 +60,14 @@ const ELIGIBILITY = `
        OR (b.blocker_id = u.id       AND b.blocked_id = me.user_id)
   )
   AND (
-    me.sexual_preference = 'bisexual'
-    OR me.gender = 'other'
-    OR (me.sexual_preference = 'heterosexual' AND me.gender = 'male'   AND p.gender = 'female')
-    OR (me.sexual_preference = 'heterosexual' AND me.gender = 'female' AND p.gender = 'male')
-    OR (me.sexual_preference = 'homosexual'   AND me.gender = 'male'   AND p.gender = 'male')
-    OR (me.sexual_preference = 'homosexual'   AND me.gender = 'female' AND p.gender = 'female')
+    me.sexual_preference = 'everyone'
+    OR (me.sexual_preference = 'men' AND p.gender = 'man')
+    OR (me.sexual_preference = 'women' AND p.gender = 'woman')
   )
   AND (
-    p.sexual_preference = 'bisexual'
-    OR p.gender = 'other'
-    OR (p.sexual_preference = 'heterosexual' AND p.gender = 'male'   AND me.gender = 'female')
-    OR (p.sexual_preference = 'heterosexual' AND p.gender = 'female' AND me.gender = 'male')
-    OR (p.sexual_preference = 'homosexual'   AND p.gender = 'male'   AND me.gender = 'male')
-    OR (p.sexual_preference = 'homosexual'   AND p.gender = 'female' AND me.gender = 'female')
+    p.sexual_preference = 'everyone'
+    OR (p.sexual_preference = 'men' AND me.gender = 'man')
+    OR (p.sexual_preference = 'women' AND me.gender = 'woman')
   )
 `;
 
@@ -82,7 +76,7 @@ const ELIGIBILITY = `
 const ME_CTE = `
   me AS (
     SELECT p.user_id, p.latitude, p.longitude, p.gender,
-           COALESCE(p.sexual_preference, 'bisexual') AS sexual_preference
+           COALESCE(p.sexual_preference, 'everyone') AS sexual_preference
     FROM profiles p
     WHERE p.user_id = $1::uuid
   )

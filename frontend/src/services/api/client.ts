@@ -28,7 +28,7 @@ export interface RequestOptions<T> {
   query?: URLSearchParams;
   responseType?: "image";
   accessToken?: string;
-  status: number;
+  status: number | readonly number[];
   validate: (value: unknown) => value is T;
 }
 
@@ -50,6 +50,7 @@ export function createApiClient(
       throw new TransportError("configuration");
     }
     if (options.query) url.search = options.query.toString();
+    const acceptsStatus = (status: number) => typeof options.status === "number" ? status === options.status : options.status.includes(status);
     const multipart = options.body instanceof FormData;
     const headers = new Headers({ Accept: options.responseType === "image" ? "image/jpeg, image/png, image/webp" : "application/json" });
     if (options.body !== undefined && !multipart) headers.set("Content-Type", "application/json");
@@ -69,13 +70,13 @@ export function createApiClient(
       });
       if (response.status === 401 && options.accessToken) invalidate(options.accessToken);
       if (response.ok && options.responseType === "image") {
-        if (response.status !== options.status || !["image/jpeg", "image/png", "image/webp"].includes(response.headers.get("content-type")?.split(";")[0] ?? "")) throw new TransportError("malformed");
+        if (!acceptsStatus(response.status) || !["image/jpeg", "image/png", "image/webp"].includes(response.headers.get("content-type")?.split(";")[0] ?? "")) throw new TransportError("malformed");
         const image = await response.blob();
         if (!options.validate(image)) throw new TransportError("malformed");
         return image;
       }
       if (response.status === 204) {
-        if (options.status !== 204 || !options.validate(undefined)) throw new TransportError("malformed");
+        if (!acceptsStatus(204) || !options.validate(undefined)) throw new TransportError("malformed");
         return undefined as T;
       }
       if (!response.headers.get("content-type")?.includes("application/json")) {
@@ -97,7 +98,7 @@ export function createApiClient(
         }
         throw new ApiRequestError(response.status, error);
       }
-      if (!response.ok || response.status !== options.status || payload.success !== true ||
+      if (!response.ok || !acceptsStatus(response.status) || payload.success !== true ||
           payload.error !== null || !options.validate(payload.data)) throw new TransportError("malformed");
       return payload.data;
     } catch (error) {
