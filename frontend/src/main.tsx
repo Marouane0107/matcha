@@ -9,6 +9,7 @@ import { readFragmentToken } from "./features/auth/utils/validation";
 import "./styles.css";
 import "./styles/profile.css";
 import { ProfileProvider, selectProfileService } from "./features/profile/ProfileProvider";
+import { DiscoveryProvider, selectDiscoveryService } from "./features/discovery/DiscoveryProvider";
 import { InteractionProvider, selectInteractions } from "./features/interactions/InteractionProvider";
 
 const initialLink = readFragmentToken(window.location, window.history);
@@ -17,13 +18,14 @@ let invalidate = (_token: string) => {};
 root.render(<p role="status">Loading Matcha...</p>);
 void Promise.all([selectAuthService(token => invalidate(token)), selectProfileService(token => invalidate(token))]).then(async ([service, profileService]) => {
   const interactions = await selectInteractions(profileService, token => invalidate(token));
+  const discoveryService = await selectDiscoveryService(interactions.profiles, token => invalidate(token));
   const session = createAuthSession(service);
   invalidate = session.invalidate;
   const router = createBrowserRouter([{ path: "*", element: <App initialLink={initialLink} /> }]);
   root.render(
     <StrictMode>
       <AuthProvider session={session} service={service}>
-        <ProfileProvider service={interactions.profiles}><InteractionProvider service={interactions.service}><RouterProvider router={router} /></InteractionProvider></ProfileProvider>
+  <ProfileProvider service={interactions.profiles}><InteractionProvider service={interactions.service}><DiscoveryProvider service={discoveryService}><RouterProvider router={router} /></DiscoveryProvider></InteractionProvider></ProfileProvider>
       </AuthProvider>
     </StrictMode>,
   );

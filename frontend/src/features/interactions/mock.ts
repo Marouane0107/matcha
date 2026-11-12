@@ -9,6 +9,7 @@ export function createMockInteractionBundle(base: ProfileService, scenario = "el
   const ids = [2, 3, 4].map(value => `00000000-0000-4000-8000-${String(value).padStart(12, "0")}`);
   const names = ["sam_demo", "noor_demo", "robin_demo"];
   const relations = new Map<string, LikeStatus>(ids.map((id, index) => [id, { likedByMe: index === 1, hasLikedMe: index < 2, isConnected: index === 1 }]));
+  const additionalProfiles = new Map<string, PublicProfile>();
   const blocks = new Map<string, Block>();
   const connectedAt = new Map<string, string>([[ids[1], "2026-11-03T12:00:00.000Z"]]);
   const otherBlocked = scenario === "blocked";
@@ -20,9 +21,11 @@ export function createMockInteractionBundle(base: ProfileService, scenario = "el
     if (scenario === "network") throw new TransportError("network");
     if (scenario === "api") fail(ERROR_CODES.INTERNAL_ERROR, 500);
   }
-  function exists(id: string) { if (!ids.includes(id)) fail(ERROR_CODES.PROFILE_NOT_FOUND, 404); }
+  function exists(id: string) { if (!ids.includes(id) && !additionalProfiles.has(id)) fail(ERROR_CODES.PROFILE_NOT_FOUND, 404); }
   const status = (id: string) => relations.get(id)!;
   async function person(id: string, token: string): Promise<PublicProfile> {
+    const additional = additionalProfiles.get(id);
+    if (additional) return { ...additional, ...status(id) };
     const index = ids.indexOf(id);
     const fixture = await base.publicProfile("sam_demo", token);
     return { ...fixture, id, username: names[index], firstName: ["Sam", "Noor", "Robin"][index], ...status(id) };
@@ -74,11 +77,18 @@ export function createMockInteractionBundle(base: ProfileService, scenario = "el
     },
     likes: (query, token) => page<Like>(query, token, () => Promise.all(ids.filter(id => visible(id) && status(id).hasLikedMe).map(async id => ({ id: `10000000-0000-4000-8000-${String(ids.indexOf(id) + 1).padStart(12, "0")}`, actor: await person(id, token), createdAt: `2026-11-0${3 - ids.indexOf(id)}T12:00:00.000Z` })))),
     views: (query, token) => page<ProfileView>(query, token, () => Promise.all(ids.filter(visible).map(async id => ({ id: `20000000-0000-4000-8000-${String(ids.indexOf(id) + 1).padStart(12, "0")}`, viewer: await person(id, token), viewedAt: `2026-11-0${3 - ids.indexOf(id)}T12:00:00.000Z` })))),
-    connections: (query, token) => page<Connection>(query, token, () => Promise.all(ids.filter(id => visible(id) && status(id).isConnected).sort((left, right) => connectedAt.get(right)!.localeCompare(connectedAt.get(left)!) || right.localeCompare(left)).map(async id => ({ user: await person(id, token), connectedAt: connectedAt.get(id)! })))),
+    connections: (query, token) => page<Connection>(query, token, () => Promise.all([...ids, ...additionalProfiles.keys()].filter(id => visible(id) && status(id).isConnected).sort((left, right) => connectedAt.get(right)!.localeCompare(connectedAt.get(left)!) || right.localeCompare(left)).map(async id => ({ user: await person(id, token), connectedAt: connectedAt.get(id)! })))),
   };
   const profiles: ProfileService = { ...base, async publicProfile(username, token) {
     const index = names.indexOf(username);
-    if (index < 0) return base.publicProfile(username, token);
+    if (index < 0) {
+      const profile = await base.publicProfile(username, token);
+      if (profile.id === ownerId) return profile;
+      if (!visible(profile.id)) fail(ERROR_CODES.PROFILE_NOT_FOUND, 404);
+      additionalProfiles.set(profile.id, profile);
+      if (!relations.has(profile.id)) relations.set(profile.id, { likedByMe: profile.likedByMe, hasLikedMe: profile.hasLikedMe, isConnected: profile.isConnected });
+      return success({ ...profile, ...status(profile.id) });
+    }
     await wait(token);
     if (!visible(ids[index])) fail(ERROR_CODES.PROFILE_NOT_FOUND, 404);
     return person(ids[index], token);
