@@ -16,6 +16,8 @@ import VerifyEmailChangePage from "./pages/VerifyEmailChangePage";
 import LocationPage from "./pages/LocationPage";
 import DiscoveryPage from "./pages/DiscoveryPage";
 import RelationshipsPage from "./pages/RelationshipsPage";
+import ChatPage from "./pages/ChatPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 export default function App({ initialLink }: { initialLink: { path: string; token: string | null } }) {
   return (
@@ -34,6 +36,9 @@ export default function App({ initialLink }: { initialLink: { path: string; toke
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
+          <Route path="/messages" element={<ChatPage />} />
+          <Route path="/messages/:userId" element={<ChatPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/browse" element={<DiscoveryPage key="browse" mode="suggestions" />} />
           <Route path="/search" element={<DiscoveryPage key="search" mode="search" />} />
           <Route path="/interactions/likes" element={<RelationshipsPage key="likes" kind="likes" />} />

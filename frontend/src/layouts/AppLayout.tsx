@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthProvider";
 import { ErrorNotice, useTask } from "../features/auth/components/Form";
+import { useRealtime } from "../features/realtime/RealtimeProvider";
 
 export default function AppLayout() {
   const { user, session } = useAuth();
+  const realtime = useRealtime();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const task = useTask();
@@ -19,7 +21,7 @@ export default function AppLayout() {
     <a className="skip-link" href="#main">Skip to main content</a>
     <header className="app-header">
       <NavLink className="wordmark" to="/profile" aria-label="Matcha home">matcha<span aria-hidden="true">.</span></NavLink>
-  <nav aria-label="Your account"><NavLink to="/browse">Browse</NavLink><NavLink to="/search">Search</NavLink><NavLink to="/profile" end>My profile</NavLink><NavLink to="/interactions/likes">Likes received</NavLink><NavLink to="/interactions/views">Visitors</NavLink><NavLink to="/interactions/connections">Connections</NavLink><NavLink to="/account">Account</NavLink></nav>
+  <nav aria-label="Your account"><NavLink to="/browse">Browse</NavLink><NavLink to="/search">Search</NavLink><NavLink to="/profile" end>My profile</NavLink><NavLink to="/interactions/likes">Likes received</NavLink><NavLink to="/interactions/views">Visitors</NavLink><NavLink to="/interactions/connections">Connections</NavLink><NavLink to="/messages">Messages</NavLink><NavLink to="/notifications">Notifications <span aria-label={`${realtime.unread} unread`}>({realtime.unread})</span></NavLink><NavLink to="/account">Account</NavLink></nav>
       <div className="account-controls"><span className="account-name">@{user?.username}</span><button className="secondary" disabled={task.busy} onClick={() => void task.run(async () => { const revoked = await session.logout(); navigate("/login", { replace: true, state: { logout: revoked ? "revoked" : "local" } }); })}>{task.busy ? "Logging out..." : "Log out"}</button></div>
     </header>
     <main id="main" tabIndex={-1} className="app-main"><ErrorNotice error={sessionError} /><ErrorNotice error={task.error} /><Outlet /></main>
