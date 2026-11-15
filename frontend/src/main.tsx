@@ -11,6 +11,8 @@ import "./styles/profile.css";
 import { ProfileProvider, selectProfileService } from "./features/profile/ProfileProvider";
 import { DiscoveryProvider, selectDiscoveryService } from "./features/discovery/DiscoveryProvider";
 import { InteractionProvider, selectInteractions } from "./features/interactions/InteractionProvider";
+import { RealtimeProvider, selectRealtime } from "./features/realtime/RealtimeProvider";
+import "./styles/realtime.css";
 
 const initialLink = readFragmentToken(window.location, window.history);
 const root = createRoot(document.getElementById("root")!);
@@ -19,13 +21,14 @@ root.render(<p role="status">Loading Matcha...</p>);
 void Promise.all([selectAuthService(token => invalidate(token)), selectProfileService(token => invalidate(token))]).then(async ([service, profileService]) => {
   const interactions = await selectInteractions(profileService, token => invalidate(token));
   const discoveryService = await selectDiscoveryService(interactions.profiles, token => invalidate(token));
+  const realtime = await selectRealtime(interactions.profiles, interactions.service, token => invalidate(token));
   const session = createAuthSession(service);
   invalidate = session.invalidate;
   const router = createBrowserRouter([{ path: "*", element: <App initialLink={initialLink} /> }]);
   root.render(
     <StrictMode>
       <AuthProvider session={session} service={service}>
-  <ProfileProvider service={interactions.profiles}><InteractionProvider service={interactions.service}><DiscoveryProvider service={discoveryService}><RouterProvider router={router} /></DiscoveryProvider></InteractionProvider></ProfileProvider>
+      <ProfileProvider service={interactions.profiles}><InteractionProvider service={interactions.service}><RealtimeProvider bundle={realtime}><DiscoveryProvider service={discoveryService}><RouterProvider router={router} /></DiscoveryProvider></RealtimeProvider></InteractionProvider></ProfileProvider>
       </AuthProvider>
     </StrictMode>,
   );

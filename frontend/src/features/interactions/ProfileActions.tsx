@@ -33,6 +33,7 @@ export default function ProfileActions({ id, username, relationship, onRelations
     {eligibility && <p><Link to="/profile">Complete your profile</Link>{" or "}<Link to="/profile/pictures">manage your main photo</Link> before liking.</p>}
     {error instanceof ApiRequestError && [ERROR_CODES.ALREADY_LIKED, ERROR_CODES.LIKE_NOT_FOUND, ERROR_CODES.USER_BLOCKED, ERROR_CODES.PROFILE_NOT_FOUND].some(code => code === error.error.code) && <button type="button" className="secondary" onClick={onReload}>Refresh profile</button>}
     {message && <p role="status" className="notice success">{message}</p>}
+    {relationship?.isConnected && !isBlocked && <p><Link to={`/messages/${encodeURIComponent(id)}`}>Message @{username}</Link></p>}
     {isBlocked ? <><p>You blocked this profile. Likes and the connection were removed.</p><div className="action-row"><button type="button" className="secondary" disabled={busy} onClick={() => void run(async () => { await service.unblock(id, accessToken!); forgetBlock(id); if (active.current) onReload(); })}>Unblock</button><button type="button" className="secondary" disabled={busy} onClick={() => { setConfirm("report"); setValidation(""); }}>Report fake profile</button></div></> : <div className="action-row">
       {relationship && <button type="button" className="primary compact" disabled={busy} onClick={() => void run(async () => {
         const status = await (relationship.likedByMe ? service.unlike(id, accessToken!) : service.like(id, accessToken!));

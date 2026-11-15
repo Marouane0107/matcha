@@ -3,6 +3,8 @@ import type { ErrorCode } from "@matcha/shared";
 import { ApiRequestError, TransportError } from "../../../services/api/client";
 
 const messages: Partial<Record<ErrorCode, string>> = {
+  [ERROR_CODES.NOT_CONNECTED]: "Messaging requires a current mutual connection.",
+  [ERROR_CODES.MESSAGE_NOT_ALLOWED]: "This message cannot be sent to that profile.",
   [ERROR_CODES.CANNOT_LIKE_SELF]: "You cannot like your own profile.",
   [ERROR_CODES.ALREADY_LIKED]: "You already like this profile. Refresh to see its current state.",
   [ERROR_CODES.LIKE_NOT_FOUND]: "This like is no longer present. Refresh the profile.",
