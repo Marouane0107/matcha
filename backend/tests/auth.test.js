@@ -5,6 +5,7 @@ import { generateToken, verifyToken, getExpiresInSeconds, validateJwtSecret } fr
 import { authenticatedRateLimit } from '../src/middleware/rate-limit.middleware.js';
 import { assertDevOrTest } from '../src/config/env.js';
 import { pagination } from '../src/utils/http.util.js';
+import { approximatePlace } from '../src/services/location.js';
 
 test('new password hashing preserves suffixes beyond bcrypt byte limit and Unicode', async () => {
   const prefix = 'A'.repeat(72);
@@ -13,6 +14,17 @@ test('new password hashing preserves suffixes beyond bcrypt byte limit and Unico
   assert.equal(await verifyPassword(prefix + 'Different123', hash), false);
   const unicode = '界'.repeat(30) + '123';
   assert.equal(await verifyPassword(unicode, await hashPassword(unicode)), true);
+});
+
+test('approximate lookup rejects private/reserved IPs, coarsens coordinates and handles failure', async () => {
+  let lookups = 0;
+  const lookup = async () => { lookups++; return { city: 'Paris', country: 'FR', ll: [48.8566, 2.3522] }; };
+  for (const ip of ['127.0.0.1', '::1', '::ffff:127.0.0.1', '10.0.0.1', '192.168.1.1', '169.254.1.1', '203.0.113.1', 'fc00::1', 'fe80::1', '2001:4860:4860::8888', 'invalid']) await assert.rejects(approximatePlace(ip, lookup));
+  assert.equal(lookups, 0);
+  assert.deepEqual(await approximatePlace('8.8.8.8', lookup), { city: 'Paris', neighborhood: null, latitude: 48.9, longitude: 2.4, mode: 'approximate' });
+  assert.deepEqual(await approximatePlace('::ffff:8.8.8.8', lookup), { city: 'Paris', neighborhood: null, latitude: 48.9, longitude: 2.4, mode: 'approximate' });
+  await assert.rejects(approximatePlace('8.8.8.8', async () => null));
+  await assert.rejects(approximatePlace('8.8.8.8', async () => { throw Error('Data unavailable'); }));
 });
 
 test('password policy agrees with frontend structural bounds and rejects common candidates', () => {

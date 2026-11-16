@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { uploadPhotoMiddleware } from '../middleware/upload.middleware.js';
 import { profile, update } from '../services/profile.js';
-import { updateLocation } from '../services/location.js';
+import { updateLocation, approximateLocation } from '../services/location.js';
 import * as pictures from '../services/pictures.js';
 import { route, send } from '../utils/http.util.js';
 import { pool } from '../config/db.js';
@@ -13,6 +13,10 @@ const router = Router();
 router.get('/me', requireAuth, route(async (req, res) => send(res, await profile(req.user.id))));
 router.patch('/me', requireAuth, route(async (req, res) => send(res, await update(req.user.id, req.body))));
 router.patch('/location', requireAuth, route(async (req, res) => send(res, await updateLocation(req.user.id, req.body))));
+router.post('/location/approximate', requireAuth, route(async (req, res) => {
+	if (req.body && Object.keys(req.body).length) throw Object.assign(new Error('VALIDATION_ERROR'), { statusCode: 422, errorCode: 'VALIDATION_ERROR' });
+	send(res, await approximateLocation(req.user.id, req.socket.remoteAddress));
+}));
 
 // Picture endpoints — match shared contract paths
 router.post('/pictures', requireAuth, uploadPhotoMiddleware, route(async (req, res) => send(res, await pictures.upload(req.user.id, req.file), 201)));

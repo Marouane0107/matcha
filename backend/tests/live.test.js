@@ -8,6 +8,7 @@ import { io as connectSocket } from 'socket.io-client';
 import jwt from 'jsonwebtoken';
 import { issueToken, consumeToken } from '../src/services/tokens.js';
 import { transaction } from '../src/services/profile.js';
+import { approximateLocation } from '../src/services/location.js';
 
 if (process.env.NODE_ENV !== 'test' || !process.env.DB_NAME?.includes('test') || !['127.0.0.1', 'localhost'].includes(process.env.DB_HOST)) throw Error('Live tests require an explicitly named local test database.');
 process.env.PORT = '0';
@@ -99,6 +100,22 @@ test('real HTTP authentication lifecycle', async context => {
     assert.equal((await request('/api/auth/login', 'POST', { username, password })).status, 401);
     assert.equal((await request('/api/auth/login', 'POST', { username, password: changed })).status, 200);
     actor = (await request('/api/auth/login', 'POST', { username, password: changed })).body.data;
+  });
+  await context.test('coarse fallback uses local data, ignores forged headers and preserves manual overrides', async () => {
+    assert.equal((await request('/api/profile/location/approximate', 'POST')).status, 401);
+    assert.equal((await request('/api/profile/location/approximate', 'POST', { ip: '8.8.8.8' }, actor.accessToken)).status, 422);
+    const forged = await fetch(base + '/api/profile/location/approximate', { method: 'POST', headers: { Authorization: `Bearer ${actor.accessToken}`, 'X-Forwarded-For': '8.8.8.8', 'Forwarded': 'for=8.8.8.8' } });
+    assert.equal(forged.status, 422); assert.equal((await forged.json()).error.code, 'LOCATION_REQUIRED');
+    assert.equal((await request('/api/profile/me', 'GET', undefined, actor.accessToken)).body.data.location, null);
+    const fallback = await approximateLocation(actor.user.id, '8.8.8.8');
+    assert.equal(fallback.location.mode, 'approximate');
+    for (const key of ['latitude', 'longitude']) assert.equal(fallback.location[key], Math.round(fallback.location[key] * 10) / 10);
+    const publicProfile = (await request('/api/profiles/' + username, 'GET', undefined, actor.accessToken)).body.data;
+    assert.deepEqual(Object.keys(publicProfile.location).sort(), ['city', 'neighborhood']);
+    const manual = await request('/api/profile/location', 'PATCH', { mode: 'manual', city: 'Paris', neighborhood: 'Centre' }, actor.accessToken);
+    assert.equal(manual.status, 200);
+    const again = await request('/api/profile/location/approximate', 'POST', undefined, actor.accessToken);
+    assert.equal(again.status, 200); assert.deepEqual(again.body.data.location, manual.body.data.location);
   });
   await context.test('canonical profile editing, curated tags and location validation', async () => {
     const tag = (await pool.query('INSERT INTO tags(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id', ['coding'])).rows[0];

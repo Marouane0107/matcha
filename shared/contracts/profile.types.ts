@@ -1,7 +1,7 @@
 export type Gender = "man" | "woman" | "non_binary";
 export type SexualPreference = "men" | "women" | "everyone";
 export const DEFAULT_SEXUAL_PREFERENCE: SexualPreference = "everyone";
-export type LocationMode = "gps" | "manual";
+export type LocationMode = "gps" | "manual" | "approximate";
 
 export interface Tag {
   id: string;

@@ -153,11 +153,15 @@ No production adapter falls back to mock data.
   JWTs, persisted session versions and all-device revocation/disconnection.
 - Protected images, atomic five-photo limit, real matching/social operations,
   persisted idempotent chat, notifications and multi-tab presence.
-- GPS is requested only after consent. Without GPS, users explicitly save a manual
-  city using an offline city dataset. Unknown/ambiguous cities are rejected;
-  region/country qualifiers disambiguate. Manual coordinates are city centroids,
-  including when a neighborhood label is provided. There is no silent IP inference
-  or external geocoding service.
+- GPS is requested only after consent. After permission denial, if no location is
+   saved and no manual draft is being entered, the server attempts a coarse lookup
+   of the connection IPv4 using bundled offline data. No device GPS permission is
+   bypassed, no IP is sent to a third party, and the raw IP is not stored in profiles.
+   Approximate coordinates are rounded to 0.1 degree, owner-only, and marked
+   `approximate`. Existing saved locations are never replaced automatically.
+- Manual city/neighborhood correction remains available. Unknown/ambiguous cities
+   are rejected; region/country qualifiers disambiguate. Manual coordinates are city
+   centroids, including when a neighborhood label is provided.
 - Production builds eliminate explicit DEV-only mock adapters. Do not submit with
   development mock flags enabled.
 
@@ -191,13 +195,26 @@ subject compliance is **not certified**. The available
 [version 5.1 mirror](https://raw.githubusercontent.com/42-matcha-dev/42-matcha/develop/project/en.subject.pdf),
 IV.2, requires an alternative approximate location when GPS is declined,
 "even without their explicit consent." It does not prescribe IP as the technology.
-Explicit manual city selection has not been shown to satisfy that clause and is
-not claimed equivalent. Check the assigned wording and resolve any mandatory
-automatic fallback before submission.
+The permission-denial fallback implements that available mandatory requirement on
+supported public IPv4 connections; exact assigned-version compliance is unverified.
 
-There is no automatic IP fallback. Manual city resolution is approximate and can
-reject unknown/ambiguous cities. Firefox must be exercised on a host with its
-runtime dependencies; a Chromium pass does not establish Firefox compatibility.
+IP lookup is best-effort: loopback/private/reserved IPs, native IPv6, missing or
+unmapped data return `422 LOCATION_REQUIRED` without inventing a location. Manual
+entry remains usable. Only `req.socket.remoteAddress` is used; forwarded headers
+are intentionally ignored. A localhost or private reverse proxy therefore cannot
+provide the user's public address to this implementation. Do not enable broad
+proxy-header trust to hide that limitation. Test public-connection deployment
+before submission; proxy/IPv6 coverage remains a limitation.
+
+The pinned MIT-licensed `fast-geoip` package includes local GeoLite-derived data
+(about 158 MiB installed). This product includes GeoLite data created by MaxMind,
+available from <https://www.maxmind.com/>. IP datasets can be stale or inaccurate;
+keep the pinned provider/data reviewed and allow manual correction. No lookup
+request or data download occurs at runtime. Rerun the additive migration before
+starting an existing database: it widens the source-mode column for `approximate`.
+
+Firefox must be exercised on a host with its runtime dependencies; a Chromium pass
+does not establish Firefox compatibility.
 
 ## Reference
 

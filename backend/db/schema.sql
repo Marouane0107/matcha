@@ -28,7 +28,7 @@ CREATE TABLE profiles (
     location_string VARCHAR(255),
     city VARCHAR(255),
     neighborhood VARCHAR(255),
-    location_mode VARCHAR(10) NOT NULL DEFAULT 'manual',
+    location_mode VARCHAR(16) NOT NULL DEFAULT 'manual',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
