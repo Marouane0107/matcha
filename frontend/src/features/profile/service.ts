@@ -7,7 +7,6 @@ export interface ProfileService {
   me(token: string): Promise<UserProfile>;
   update(request: ProfileUpdateRequest, token: string): Promise<UserProfile>;
   updateLocation(request: LocationUpdateRequest, token: string): Promise<UserProfile>;
-  approximateLocation(token: string): Promise<UserProfile>;
   publicProfile(username: string, token: string): Promise<PublicProfile>;
   tags(token: string): Promise<Tag[]>;
   image(id: string, token: string): Promise<Blob>;
@@ -27,7 +26,7 @@ function identity(value: unknown): value is Record<string, unknown> {
 }
 const publicLocation = (value: unknown) => value === null || isRecord(value) && typeof value.city === "string" && (value.neighborhood === null || typeof value.neighborhood === "string");
 export function isUserProfile(value: unknown): value is UserProfile {
-  return identity(value) && typeof value.email === "string" && (value.dateOfBirth === null || typeof value.dateOfBirth === "string") && typeof value.profileComplete === "boolean" && publicLocation(value.location) && (value.location === null || isRecord(value.location) && typeof value.location.latitude === "number" && Number.isFinite(value.location.latitude) && Math.abs(value.location.latitude) <= 90 && typeof value.location.longitude === "number" && Number.isFinite(value.location.longitude) && Math.abs(value.location.longitude) <= 180 && ["gps", "manual", "approximate"].includes(String(value.location.mode)));
+  return identity(value) && typeof value.email === "string" && (value.dateOfBirth === null || typeof value.dateOfBirth === "string") && typeof value.profileComplete === "boolean" && publicLocation(value.location) && (value.location === null || isRecord(value.location) && typeof value.location.latitude === "number" && Number.isFinite(value.location.latitude) && Math.abs(value.location.latitude) <= 90 && typeof value.location.longitude === "number" && Number.isFinite(value.location.longitude) && Math.abs(value.location.longitude) <= 180 && ["gps", "manual"].includes(String(value.location.mode)));
 }
 export function isPublicProfile(value: unknown): value is PublicProfile {
   return identity(value) && !["email", "dateOfBirth", "password", "passwordHash", "password_hash", "accessToken", "latitude", "longitude", "profileComplete"].some(key => key in value) && (value.age === null || Number.isInteger(value.age) && Number(value.age) >= 18 && Number(value.age) <= 120) && publicLocation(value.location) && (value.location === null || isRecord(value.location) && Object.keys(value.location).every(key => ["city", "neighborhood"].includes(key))) && ["likedByMe", "hasLikedMe", "isConnected"].every(key => typeof value[key] === "boolean");
@@ -41,7 +40,6 @@ export function createRealProfileService(client: ReturnType<typeof createApiClie
     me: accessToken => client.request(routes.ME, { accessToken, status: 200, validate: isUserProfile }),
     update: (body, accessToken) => client.request(routes.ME, { method: "PATCH", body, accessToken, status: 200, validate: isUserProfile }),
     updateLocation: (body, accessToken) => client.request(routes.LOCATION, { method: "PATCH", body, accessToken, status: 200, validate: isUserProfile }),
-    approximateLocation: accessToken => client.request(routes.APPROXIMATE_LOCATION, { method: "POST", accessToken, status: 200, validate: isUserProfile }),
     publicProfile: (username, accessToken) => client.request(routes.PUBLIC.replace(":username", encodeURIComponent(username)), { accessToken, status: 200, validate: isPublicProfile }),
     tags: accessToken => client.request(routes.TAGS, { accessToken, status: 200, validate: (value): value is Tag[] => Array.isArray(value) && value.every(isTag) }),
     image: (id, accessToken) => client.request(picturePath(routes.PICTURE, id), { accessToken, responseType: "image", status: 200, validate: (value): value is Blob => value instanceof Blob && value.size > 0 }),

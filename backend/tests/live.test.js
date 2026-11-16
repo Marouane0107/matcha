@@ -8,7 +8,6 @@ import { io as connectSocket } from 'socket.io-client';
 import jwt from 'jsonwebtoken';
 import { issueToken, consumeToken } from '../src/services/tokens.js';
 import { transaction } from '../src/services/profile.js';
-import { approximateLocation } from '../src/services/location.js';
 
 if (process.env.NODE_ENV !== 'test' || !process.env.DB_NAME?.includes('test') || !['127.0.0.1', 'localhost'].includes(process.env.DB_HOST)) throw Error('Live tests require an explicitly named local test database.');
 process.env.PORT = '0';
@@ -45,7 +44,7 @@ test('real HTTP authentication lifecycle', async context => {
     const payload = { username, email, firstName: 'Local', lastName: 'Test', password };
     assert.equal((await request('/api/auth/register', 'POST', { ...payload, email: 'invalid' })).status, 422);
     assert.equal((await request('/api/auth/register', 'POST', { ...payload, username: 'spaces invalid' })).status, 422);
-    assert.equal((await request('/api/auth/register', 'POST', { ...payload, password: 'Password123456!' })).body.error.code, 'PASSWORD_TOO_COMMON');
+    assert.equal((await request('/api/auth/register', 'POST', { ...payload, password: 'Strawberry123456!' })).body.error.code, 'PASSWORD_TOO_COMMON');
     assert.equal((await request('/api/auth/register', 'POST', payload)).status, 201);
     assert.equal((await request('/api/auth/login', 'POST', { username, password })).status, 403);
   });
@@ -101,29 +100,17 @@ test('real HTTP authentication lifecycle', async context => {
     assert.equal((await request('/api/auth/login', 'POST', { username, password: changed })).status, 200);
     actor = (await request('/api/auth/login', 'POST', { username, password: changed })).body.data;
   });
-  await context.test('coarse fallback uses local data, ignores forged headers and preserves manual overrides', async () => {
-    assert.equal((await request('/api/profile/location/approximate', 'POST')).status, 401);
-    assert.equal((await request('/api/profile/location/approximate', 'POST', { ip: '8.8.8.8' }, actor.accessToken)).status, 422);
-    const forged = await fetch(base + '/api/profile/location/approximate', { method: 'POST', headers: { Authorization: `Bearer ${actor.accessToken}`, 'X-Forwarded-For': '8.8.8.8', 'Forwarded': 'for=8.8.8.8' } });
-    assert.equal(forged.status, 422); assert.equal((await forged.json()).error.code, 'LOCATION_REQUIRED');
-    assert.equal((await request('/api/profile/me', 'GET', undefined, actor.accessToken)).body.data.location, null);
-    const fallback = await approximateLocation(actor.user.id, '8.8.8.8');
-    assert.equal(fallback.location.mode, 'approximate');
-    for (const key of ['latitude', 'longitude']) assert.equal(fallback.location[key], Math.round(fallback.location[key] * 10) / 10);
-    const publicProfile = (await request('/api/profiles/' + username, 'GET', undefined, actor.accessToken)).body.data;
-    assert.deepEqual(Object.keys(publicProfile.location).sort(), ['city', 'neighborhood']);
-    const manual = await request('/api/profile/location', 'PATCH', { mode: 'manual', city: 'Paris', neighborhood: 'Centre' }, actor.accessToken);
-    assert.equal(manual.status, 200);
-    const again = await request('/api/profile/location/approximate', 'POST', undefined, actor.accessToken);
-    assert.equal(again.status, 200); assert.deepEqual(again.body.data.location, manual.body.data.location);
-  });
   await context.test('canonical profile editing, curated tags and location validation', async () => {
+    assert.equal((await request('/api/profile/me', 'GET', undefined, actor.accessToken)).body.data.sexualPreference, 'everyone');
     const tag = (await pool.query('INSERT INTO tags(name) VALUES($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id', ['coding'])).rows[0];
     const updated = await request('/api/profile/me', 'PATCH', { firstName: 'Local', lastName: 'Test', dateOfBirth: '1996-01-01', gender: 'man', sexualPreference: 'everyone', bio: 'A real profile', tagIds: [tag.id] }, actor.accessToken);
     assert.equal(updated.status, 200); assert.equal(updated.body.data.id, actor.user.id); assert.equal(updated.body.data.bio, 'A real profile');
     assert.equal(updated.body.data.dateOfBirth, '1996-01-01');
     assert(Array.isArray((await request('/api/tags', 'GET', undefined, actor.accessToken)).body.data));
+    assert.equal((await request('/api/profiles/suggestions', 'GET', undefined, actor.accessToken)).body.error.code, 'LOCATION_REQUIRED');
+    assert.equal((await request('/api/profiles/search', 'GET', undefined, actor.accessToken)).body.error.code, 'LOCATION_REQUIRED');
     assert.equal((await request('/api/profile/location', 'PATCH', { mode: 'manual', city: 'Paris', neighborhood: null }, actor.accessToken)).status, 200);
+    assert.equal((await request('/api/profiles/suggestions', 'GET', undefined, actor.accessToken)).body.error.code, 'PROFILE_INCOMPLETE');
     assert.equal((await request('/api/profile/location', 'PATCH', { mode: 'manual', city: 'Invented place', neighborhood: null }, actor.accessToken)).status, 422);
     assert.equal((await request('/api/profile/location', 'PATCH', { mode: 'manual', city: 'Springfield', neighborhood: null }, actor.accessToken)).status, 422);
     const manual = await request('/api/profile/location', 'PATCH', { mode: 'manual', city: 'Tokyo, Japan', neighborhood: 'Shibuya' }, actor.accessToken);
@@ -188,6 +175,12 @@ test('real HTTP authentication lifecycle', async context => {
     assert.equal((await fetch(base + '/api/profile/pictures', { method: 'POST', headers: { Authorization: `Bearer ${peer.accessToken}` }, body })).status, 201);
   });
   await context.test('SQL discovery honors canonical filters, all tag IDs, origin and private DTO boundaries', async () => {
+    assert.equal((await request('/api/profile/me', 'GET', undefined, peer.accessToken)).body.data.sexualPreference, 'everyone');
+    await request('/api/profile/me', 'PATCH', { sexualPreference: 'women' }, peer.accessToken);
+    assert(!(await request('/api/profiles/search?maxDistance=1&limit=100', 'GET', undefined, actor.accessToken)).body.data.items.some(item => item.id === peer.user.id));
+    await request('/api/profile/me', 'PATCH', { sexualPreference: 'men' }, peer.accessToken);
+    assert((await request('/api/profiles/search?maxDistance=1&limit=100', 'GET', undefined, actor.accessToken)).body.data.items.some(item => item.id === peer.user.id));
+    await request('/api/profile/me', 'PATCH', { sexualPreference: 'everyone' }, peer.accessToken);
     const tag = (await request('/api/tags', 'GET', undefined, actor.accessToken)).body.data[0];
     const result = await request(`/api/profiles/search?tags=${tag.id}&sortBy=age&sortOrder=desc&limit=100`, 'GET', undefined, actor.accessToken);
     assert.equal(result.status, 200); assert(result.body.data.items.some(item => item.id === peer.user.id));

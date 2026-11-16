@@ -7,11 +7,12 @@ commands are recorded in the [root README](../README.md).
 Implementation notes: the existing `tokens` table stores purpose-bound digests
 instead of adding token fields to `users`; `is_verified` represents verification.
 `CORS_ORIGIN` is the configured frontend origin for CORS and fragment links. The
-bundled denylist is original project-authored policy data, version
-`matcha-local-2026-11-16`, with no copied third-party password corpus. It covers
-common words/patterns, not every breached password. Argon2id uses 19 MiB, two
-iterations and one lane. A broader breach corpus needs explicit licensing and
-maintenance. The existing API/DTO shapes are unchanged.
+password policy combines MIT-licensed `word-list@4.1.0` English dictionary data
+with original project-authored common-password patterns, version
+`word-list-4.1.0+matcha-local-2026-11-16`. The local dictionary is loaded at startup
+and missing/incomplete data fails closed. Numeric/punctuation wrappers around a
+single dictionary word are rejected. This is not a complete breach corpus.
+Argon2id uses 19 MiB, two iterations and one lane. The existing API/DTO shapes are unchanged.
 
 ## Login and Storage
 

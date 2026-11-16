@@ -21,11 +21,7 @@ uploaded images are private local WebP files.
 Manual location uses the offline MIT-licensed `city-timezones` dataset plus public
 preset centroids. Region/country qualifiers disambiguate cities. Neighborhood is a
 user-provided label; manual distance is approximate at city level. No external
-geocoder is used. On GPS permission denial, the authenticated coarse-location
-endpoint can fill an empty location from the connection IPv4 using bundled local
-data. It never replaces a saved location, trusts forwarded headers, or collects
-device GPS. Unsupported/private/proxied connections fail to manual entry; see the
-root README for deployment and subject limitations.
+geocoder or silent IP inference is used.
 
 Use the executable [schema](db/schema.sql) and
 [additive migration](db/migrations/0001_mandatory.sql) for database setup.

@@ -1,17 +1,22 @@
 import bcrypt from 'bcrypt';
 import crypto from 'node:crypto';
 import argon2 from 'argon2';
+import { readFileSync } from 'node:fs';
+import wordListPath from 'word-list';
+
+const dictionary = new Set(readFileSync(wordListPath, 'utf8').trim().split(/\r?\n/));
+if (dictionary.size < 100000) throw new Error('Password dictionary is unavailable or incomplete');
 
 export const isPasswordStrong = (password) => {
   return typeof password === 'string' && [...password].length >= 12 && [...password].length <= 128 && /\p{L}/u.test(password) && /\p{N}/u.test(password);
 };
 
-export const passwordDenylistVersion = 'matcha-local-2026-11-16';
+export const passwordDenylistVersion = 'word-list-4.1.0+matcha-local-2026-11-16';
 const common = new Set('password passwordpassword letmein welcome qwerty iloveyou admin administrator monkey dragon football baseball sunshine princess trustno1 abcdef abcdefgh english computer internet secret login master hello changeme security superman batman michael jennifer charlie donald summer winter spring autumn november december january october september august april march february correcthorsebatterystaple'.split(' '));
 export const isCommonPassword = password => {
   const normalized = password.normalize('NFKC').toLowerCase();
   const candidate = normalized.replace(/[^a-z0-9]/g, '').replace(/^\d+|\d+$/g, '');
-  return common.has(normalized) || common.has(candidate) || /^(password|qwerty|letmein|welcome|iloveyou|admin|123456)/.test(normalized);
+  return dictionary.has(candidate) || common.has(normalized) || common.has(candidate) || /^(password|qwerty|letmein|welcome|iloveyou|admin|123456)/.test(normalized);
 };
 const digest = password => crypto.createHash('sha256').update(password, 'utf8').digest('base64');
 

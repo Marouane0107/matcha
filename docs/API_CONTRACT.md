@@ -107,7 +107,6 @@ its hash, not subjected to the new-password denylist policy.
 | PATCH /api/profile/pictures/:pictureId/main | Yes | None | None | 200 PictureCollection | 404 NOT_FOUND (also not owned) |
 | GET /api/tags | Yes | None | None | 200 Tag[] | Common errors only |
 | PATCH /api/profile/location | Yes | LocationUpdateRequest | None | 200 UserProfile | 404 PROFILE_NOT_FOUND |
-| POST /api/profile/location/approximate | Yes | None | None | 200 UserProfile | 422 LOCATION_REQUIRED when the connection cannot be located |
 
 `UserProfile` is owner-only and includes email, birth date, exact coordinates and
 completion state. `PublicProfile` excludes these; it exposes calculated age and
@@ -134,18 +133,6 @@ reusable curated catalog, sorted by name then ID; there is no
 user-created tag endpoint. Picture responses return the complete ordered array.
 The first picture becomes main; deleting main promotes the lowest remaining position.
 At most five pictures, positions 1..5, exactly one main whenever pictures exist.
-
-Mandatory fallback addition: after GPS permission denial with no saved location or
-manual draft, the client POSTs the approximate endpoint, without coordinates or an
-IP in its body. The backend uses only the socket's public IPv4 and bundled offline
-GeoLite-derived data, rounds coordinates to 0.1 degree, stores a nullable-neighborhood
-city/country label, and returns owner `Location.mode="approximate"`. This is a
-read-only source mode: PATCH still accepts only `gps` or `manual`. Public profiles
-still expose only city/neighborhood, never source mode, IP or coordinates.
-An atomic empty-location-only update prevents overwriting saved GPS/manual edits.
-Private/reserved/unmapped IPs and native IPv6 return `422 LOCATION_REQUIRED`; no
-precise GPS retry or third-party lookup is performed. Forwarded headers are ignored.
-Manual correction always remains available. See the root README for proxy limits.
 
 Completion requires verified email, first/last name, adult birth date, gender,
 nonblank bio, at least one tag, a main picture and location. No explicit orientation

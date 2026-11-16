@@ -25,7 +25,6 @@ export function createMockProfileService(delay = 250): ProfileService {
   const existing = (id: string) => profile.pictures.find(picture => picture.id === id) ?? fail(ERROR_CODES.NOT_FOUND, 404);
   return {
     async me(token) { await wait(token); return success(profile); },
-    async approximateLocation(token) { await wait(token); return fail(ERROR_CODES.LOCATION_REQUIRED); },
     async updateLocation(request, token) {
       await wait(token);
       if (Object.keys(locationErrors(request)).length) fail(ERROR_CODES.VALIDATION_ERROR);
