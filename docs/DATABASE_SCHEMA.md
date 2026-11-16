@@ -256,7 +256,8 @@ which foreign keys alone cannot enforce. Acquire both user row locks in ascendin
 UUID order for pair operations (like/unlike/block/send) to avoid deadlocks and races.
 Check block/connection state under these locks; persist related notifications in the
 same transaction and emit socket events only after commit. All operations affecting
-these invariants use the same locking protocol. See [backend guide](OUSSAMA_BACKEND_GUIDE.md).
+these invariants use the same locking protocol. See the current
+[transaction and pair-lock helpers](../backend/src/services/profile.js).
 
 No database objects are created during Phase 0. First migrations will add these 11
 business tables plus a small schema_migrations ledger (version text primary key,

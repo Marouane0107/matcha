@@ -1,8 +1,8 @@
 # Authentication Strategy
 
 Phase 0 decision: one short-lived access JWT, no refresh tokens and no cookies.
-The backend owns authentication and authorization. Implementation and verification
-evidence are recorded in [the fix handoff](INTRA_FIX_STATUS.md).
+The backend owns authentication and authorization. Current setup and verification
+commands are recorded in the [root README](../README.md).
 
 Implementation notes: the existing `tokens` table stores purpose-bound digests
 instead of adding token fields to `users`; `is_verified` represents verification.
