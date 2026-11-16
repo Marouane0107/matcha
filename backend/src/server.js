@@ -1,4 +1,5 @@
 import express from 'express';
+import bodyParser from 'body-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
@@ -11,22 +12,28 @@ import authRoutes from './routes/auth.routes.js';
 import profileRoutes, { tagRouter } from './routes/profile.routes.js';
 import browseRoutes from './routes/browse.routes.js';
 import interactionRoutes, { interactionsRouter } from './routes/interaction.routes.js';
+import { chatRouter, notificationRouter } from './routes/realtime.routes.js';
+import { attachSockets } from './sockets/index.js';
+import { rateLimit } from './middleware/rate-limit.middleware.js';
+import { validateJwtSecret } from './utils/jwt.util.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
+validateJwtSecret();
 
-const app = express();
-const server = http.createServer(app);
+export const app = express();
+export const server = http.createServer(app);
 
 // Environment variables configuration
 const PORT = process.env.PORT || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
 // Socket.io configuration
-const io = new Server(server, {
+export const io = new Server(server, {
+  maxHttpBufferSize: 16384,
   cors: {
     origin: CORS_ORIGIN,
     methods: ['GET', 'POST']
@@ -35,16 +42,17 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors({ origin: CORS_ORIGIN }));
-app.use(express.json());
+app.use(bodyParser.json({ limit: '32kb' }));
+app.use(rateLimit);
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  if (process.env.NODE_ENV !== 'test') console.log(`${req.method} ${req.path}`);
   next();
 });
 
 // Static files for photo uploads
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', (_req, res) => res.status(404).json(apiError(ERROR_CODES.NOT_FOUND, 'Not found')));
 
 // Routes — aligned with shared API_ROUTES contract
 app.use('/api/auth', authRoutes);
@@ -53,6 +61,8 @@ app.use('/api/profiles', browseRoutes);       // plural — suggestions & search
 app.use('/api/profiles', interactionRoutes);  // plural — public profile, like/block/report
 app.use('/api/interactions', interactionsRouter);
 app.use('/api/tags', tagRouter);
+app.use('/api/conversations', chatRouter);
+app.use('/api/notifications', notificationRouter);
 
 // Health check endpoint
 app.get('/health', async (req, res, next) => {
@@ -69,22 +79,18 @@ app.get('/health', async (req, res, next) => {
 });
 
 // Socket.io events
-io.on('connection', (socket) => {
-  console.log(`[Socket] connected: ${socket.id}`);
+attachSockets(io);
 
-  socket.on('disconnect', () => {
-    console.log(`[Socket] disconnected: ${socket.id}`);
-  });
-});
+app.use((_req, res) => res.status(404).json(apiError(ERROR_CODES.NOT_FOUND, 'Not found')));
 
 // Global error-handling middleware — uses shared ApiFailure envelope
 app.use((err, req, res, next) => {
-  console.error('[Error]:', err.message || err);
+  if (process.env.NODE_ENV !== 'test' && (err.statusCode ?? 500) >= 500) console.error('Request failed');
 
-  const statusCode = err.statusCode || 500;
-  const code = err.errorCode || ERROR_CODES.INTERNAL_ERROR;
+  const statusCode = err.statusCode || err.status || 500;
+  const code = err.errorCode || (statusCode === 400 || statusCode === 413 ? ERROR_CODES.VALIDATION_ERROR : ERROR_CODES.INTERNAL_ERROR);
   // Sanitize error message in production for 500 errors
-  const message = process.env.NODE_ENV === 'production' && statusCode === 500
+  const message = statusCode >= 500
     ? 'Internal Server Error'
     : err.message || 'Internal Server Error';
 

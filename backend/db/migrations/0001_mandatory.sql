@@ -1,0 +1,20 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version integer NOT NULL DEFAULT 0;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS pending_email varchar(255);
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS city varchar(255);
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS neighborhood varchar(255);
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS location_mode varchar(10) NOT NULL DEFAULT 'manual';
+UPDATE profiles SET city=location_string WHERE city IS NULL AND location_string IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_one_per_user ON profiles(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_casefold ON users(lower(email));
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS position integer;
+WITH ranked AS (SELECT id, row_number() OVER (PARTITION BY user_id ORDER BY is_profile_picture DESC,created_at,id) AS ordinal FROM photos)
+UPDATE photos SET position=ranked.ordinal FROM ranked WHERE photos.id=ranked.id AND photos.position IS NULL;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS client_message_id uuid;
+UPDATE messages SET client_message_id=id WHERE client_message_id IS NULL;
+ALTER TABLE messages ALTER COLUMN client_message_id SET NOT NULL;
+ALTER TABLE messages ALTER COLUMN client_message_id SET DEFAULT uuid_generate_v4();
+CREATE UNIQUE INDEX IF NOT EXISTS messages_client_identity ON messages(sender_id,client_message_id);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS message_id uuid REFERENCES messages(id) ON DELETE SET NULL;
+ALTER TABLE notifications ALTER COLUMN sender_id DROP NOT NULL;
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_sender_id_fkey;
+ALTER TABLE notifications ADD CONSTRAINT notifications_sender_id_fkey FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE SET NULL;

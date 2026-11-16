@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import { hashPassword } from '../src/utils/password.util.js';
 import { faker } from '@faker-js/faker';
 import { pool } from '../src/config/db.js';
 import { assertDevOrTest } from '../src/config/env.js';
@@ -48,8 +48,8 @@ export async function seedDatabase(targetCount = 520) {
 
     // 2. Hash the shared dev-only default password once for speed
     console.log('🔑 Hashing default password...');
-    const defaultPassword = process.env.SEED_DEFAULT_PASSWORD || 'Matcha123!';
-    const defaultPasswordHash = await bcrypt.hash(defaultPassword, 10);
+    const defaultPassword = process.env.SEED_DEFAULT_PASSWORD || 'MatchaSeed2026!';
+    const defaultPasswordHash = await hashPassword(defaultPassword);
 
     // 3. Generate Users & Profiles
     console.log(`👥 Generating ${targetCount} users and profiles...`);
@@ -181,8 +181,8 @@ export async function seedDatabase(targetCount = 520) {
         const isMain = p === 0;
         const photoUrl = `https://picsum.photos/seed/matcha-${u.id}-${p}/600/600`;
         await client.query(
-          `INSERT INTO photos (user_id, url, is_profile_picture) VALUES ($1, $2, $3)`,
-          [u.id, photoUrl, isMain]
+          `INSERT INTO photos (user_id, url, is_profile_picture, position) VALUES ($1, $2, $3, $4)`,
+          [u.id, photoUrl, isMain, p + 1]
         );
       }
     }
@@ -292,7 +292,7 @@ export async function seedDatabase(targetCount = 520) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`✅ Deterministic seed complete in ${duration}s!`);
     console.log(`👤 Seeded users count: ${userRecords.length}`);
-    console.log(`🔑 Tester account: tester@matcha.com / ${defaultPassword} (Username: matcha_tester) — development-only`);
+    console.log('Tester username: matcha_tester. Password comes from SEED_DEFAULT_PASSWORD.');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Error during seeding:', err);

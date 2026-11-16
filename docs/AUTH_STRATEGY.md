@@ -1,7 +1,17 @@
 # Authentication Strategy
 
 Phase 0 decision: one short-lived access JWT, no refresh tokens and no cookies.
-The backend owns authentication and authorization. Nothing here is implemented yet.
+The backend owns authentication and authorization. Implementation and verification
+evidence are recorded in [the fix handoff](INTRA_FIX_STATUS.md).
+
+Implementation notes: the existing `tokens` table stores purpose-bound digests
+instead of adding token fields to `users`; `is_verified` represents verification.
+`CORS_ORIGIN` is the configured frontend origin for CORS and fragment links. The
+bundled denylist is original project-authored policy data, version
+`matcha-local-2026-11-16`, with no copied third-party password corpus. It covers
+common words/patterns, not every breached password. Argon2id uses 19 MiB, two
+iterations and one lane. A broader breach corpus needs explicit licensing and
+maintenance. The existing API/DTO shapes are unchanged.
 
 ## Login and Storage
 

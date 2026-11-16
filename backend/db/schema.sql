@@ -7,6 +7,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     is_verified BOOLEAN DEFAULT FALSE,
+    token_version INTEGER NOT NULL DEFAULT 0,
     last_seen TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -25,6 +26,9 @@ CREATE TABLE profiles (
     latitude FLOAT,
     longitude FLOAT,
     location_string VARCHAR(255),
+    city VARCHAR(255),
+    neighborhood VARCHAR(255),
+    location_mode VARCHAR(10) NOT NULL DEFAULT 'manual',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -47,6 +51,7 @@ CREATE TABLE photos (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     url VARCHAR(255) NOT NULL,
     is_profile_picture BOOLEAN DEFAULT FALSE,
+    position INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -77,6 +82,7 @@ CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     receiver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    client_message_id UUID NOT NULL DEFAULT uuid_generate_v4(),
     content TEXT NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -85,7 +91,8 @@ CREATE TABLE messages (
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     type VARCHAR(50) NOT NULL,
     content TEXT,
     is_read BOOLEAN DEFAULT FALSE,
@@ -98,6 +105,7 @@ CREATE TABLE tokens (
     token_hash VARCHAR(255) NOT NULL,
     type VARCHAR(50) NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    pending_email VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -110,3 +118,7 @@ CREATE TABLE reports (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (reporter_id, reported_id)
 );
+
+CREATE UNIQUE INDEX profiles_one_per_user ON profiles(user_id);
+CREATE UNIQUE INDEX messages_client_identity ON messages(sender_id,client_message_id);
+CREATE UNIQUE INDEX users_email_casefold ON users(lower(email));

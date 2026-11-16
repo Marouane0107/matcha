@@ -7,4 +7,9 @@ export function assertDevOrTest(label = 'This operation') {
         `Set NODE_ENV=development (or test) and retry.`
     );
   }
+  const database = process.env.DB_NAME || '';
+  const host = process.env.DB_HOST || 'localhost';
+  if (!['localhost', '127.0.0.1', '::1', 'postgres', 'db'].includes(host) || !/(^|_)(dev|test)(_|$)/i.test(database) || process.env.DB_CONFIRM_NAME !== database) {
+    throw new Error(`${label} requires a local dev/test database and DB_CONFIRM_NAME equal to DB_NAME.`);
+  }
 }

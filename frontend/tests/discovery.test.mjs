@@ -203,6 +203,17 @@ test("empty, network and incomplete states render recovery actions", async conte
   assert(document.querySelector('a[href="/profile/location"]'));
 });
 
+test("advanced search submits a selected public city origin and resets it", async context => {
+  const calls = [];
+  await mount(context, { ...mock, search: (query, token) => { calls.push(query); return mock.search(query, token); } }, "search");
+  await change('#discovery-location', 'casablanca');
+  await click(button('Search'));
+  assert.deepEqual(calls.at(-1).location, { latitude: 33.5731, longitude: -7.5898 });
+  await click(button('Reset'));
+  assert.equal(document.querySelector('#discovery-location').value, '');
+  assert.equal(calls.at(-1).location, undefined);
+});
+
 test("late result cannot overwrite a newer criteria request", async context => {
   let resolveOld;
   let requests = 0;

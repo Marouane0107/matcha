@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import type { PaginatedData, ProfileSearchResult, SearchQuery, Tag } from "@matcha/shared";
-import { ERROR_CODES } from "@matcha/shared";
+import { ERROR_CODES, LOCATION_CATALOG } from "@matcha/shared";
 import { useAuth } from "../features/auth/AuthProvider";
 import { ErrorNotice, Field } from "../features/auth/components/Form";
 import { useProfileService } from "../features/profile/ProfileProvider";
@@ -36,6 +36,7 @@ export default function DiscoveryPage({ mode }: { mode: "suggestions" | "search"
   const [selected, setSelected] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SearchQuery["sortBy"]>();
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [location, setLocation] = useState("");
   const [query, setQuery] = useState<SearchQuery>({ page: 1, limit: 12 });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [tags, setTags] = useState<Tag[] | null>(null);
@@ -58,6 +59,8 @@ export default function DiscoveryPage({ mode }: { mode: "suggestions" | "search"
   function submit(event: FormEvent) {
     event.preventDefault();
     const next: SearchQuery = { page: 1, limit: 12, tags: selected, ...(sortBy ? { sortBy, sortOrder } : {}) };
+    const place = LOCATION_CATALOG.find(place => place.id === location);
+    if (place && mode === "search") next.location = { latitude: place.latitude, longitude: place.longitude };
     for (const key of Object.keys(numericFilters) as FilterKey[]) if (draft[key].trim()) next[key] = Number(draft[key]);
     const invalid = searchErrors(next);
     setErrors(invalid);
@@ -68,12 +71,13 @@ export default function DiscoveryPage({ mode }: { mode: "suggestions" | "search"
   return <>
     <div className="page-toolbar"><div><p className="eyebrow">People nearby</p><h1 tabIndex={-1}>{mode === "suggestions" ? "Browse" : "Advanced search"}</h1></div></div>
     <form onSubmit={submit} noValidate className="discovery-filters" aria-label="Profile filters">
+      {mode === "search" && <div className="field"><label htmlFor="discovery-location">Location</label><select id="discovery-location" value={location} onChange={event => setLocation(event.target.value)}><option value="">My saved area</option>{LOCATION_CATALOG.map(place => <option key={place.id} value={place.id}>{place.city}</option>)}</select></div>}
       <div className="discovery-filter-grid">{(Object.entries(numericFilters) as [FilterKey, string][]).map(([key, label]) => <Field key={key} label={label} name={key} type="number" min={key.endsWith("Age") ? 18 : 0} max={key.endsWith("Age") ? 120 : key === "maxDistance" ? 20000 : 100} step={key.endsWith("Age") ? 1 : "any"} value={draft[key]} onChange={event => setDraft(current => ({ ...current, [key]: event.target.value }))} error={errors[key]} />)}
         <div className="field"><label htmlFor="discovery-sort">Sort by</label><select id="discovery-sort" value={sortBy ?? ""} onChange={event => setSortBy(event.target.value ? event.target.value as SearchQuery["sortBy"] : undefined)}><option value="">{mode === "suggestions" ? "Suggested order" : "Default distance"}</option>{Object.entries(sortLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
         <div className="field"><label htmlFor="discovery-order">Order</label><select id="discovery-order" disabled={!sortBy} value={sortOrder} onChange={event => setSortOrder(event.target.value as "asc" | "desc")}><option value="asc">Ascending</option><option value="desc">Descending</option></select></div>
       </div>
       <fieldset className="discovery-tags"><legend>Interests</legend>{tagError ? <><ErrorNotice error={tagError} /><button type="button" className="secondary" onClick={() => setTagAttempt(value => value + 1)}>Retry interests</button></> : !tags ? <p role="status">Loading interests...</p> : <div className="tag-options">{tags.map(tag => <label key={tag.id} className={selected.includes(tag.id) ? "selected" : ""}><input type="checkbox" checked={selected.includes(tag.id)} disabled={selected.length >= 10 && !selected.includes(tag.id)} onChange={() => setSelected(current => toggleTag(current, tag.id))} />{tag.name}</label>)}</div>}{errors.tags && <p role="alert">{errors.tags}</p>}</fieldset>
-      <div className="action-row"><button className="primary compact" type="submit">{mode === "search" ? "Search" : "Apply filters"}</button><button className="secondary" type="button" onClick={() => { setDraft(blank); setSelected([]); setSortBy(undefined); setSortOrder("asc"); setErrors({}); setQuery({ page: 1, limit: 12 }); }}>Reset</button></div>
+      <div className="action-row"><button className="primary compact" type="submit">{mode === "search" ? "Search" : "Apply filters"}</button><button className="secondary" type="button" onClick={() => { setDraft(blank); setSelected([]); setSortBy(undefined); setSortOrder("asc"); setLocation(""); setErrors({}); setQuery({ page: 1, limit: 12 }); }}>Reset</button></div>
     </form>
     <section aria-label="Profile results" aria-busy={state.loading} className="discovery-results">
       {state.loading || state.token !== accessToken ? <p role="status">Loading profiles...</p> : state.error ? <div className="profile-empty">{eligibility ? <><h2>Complete your profile to discover people</h2><p>A saved location and complete profile are required.</p><div className="action-row"><Link to="/profile">Review profile</Link><Link to="/profile/location">Update location</Link></div></> : <><ErrorNotice error={state.error} /></>}<button className="secondary" onClick={() => setAttempt(value => value + 1)}>Try again</button></div> : data && <>

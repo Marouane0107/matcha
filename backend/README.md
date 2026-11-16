@@ -1,4 +1,32 @@
-# Matcha Backend - Phase 1 Documentation
+# Matcha Backend
+
+Current setup and verification: [root README](../README.md) and
+[Intra fix handoff](../docs/INTRA_FIX_STATUS.md). Routes and payloads follow
+[API_CONTRACT](../docs/API_CONTRACT.md) and [SOCKET_EVENTS](../docs/SOCKET_EVENTS.md).
+
+The runtime is JavaScript ESM with Express, parameterized PostgreSQL queries and
+authenticated Socket.IO. Build checks syntax; typecheck checks JavaScript through
+TypeScript. Start runs `src/server.js`, not a compiled placeholder.
+
+Authentication uses Argon2id, memory-only 15-minute bearer JWTs, persisted session
+versions and immediate socket revocation. Login accepts `username` and `password`.
+Verification/reset links carry fragment tokens and use POST endpoints. JSON
+responses use `{ success, data, error }`. Logout invalidates all devices.
+
+Run commands from the repository root with `--workspace=backend`. Configure actual
+DB/SMTP values, `JWT_SECRET` (32+ random bytes) and `CORS_ORIGIN` locally. Use
+`npm run migrate --workspace=backend` for the additive migration. Seed/reset refuse
+unconfirmed or non-local dev/test targets. Seeded images require Picsum access;
+uploaded images are private local WebP files.
+
+Manual location uses the offline MIT-licensed `city-timezones` dataset plus public
+preset centroids. Region/country qualifiers disambiguate cities. Neighborhood is a
+user-provided label; manual distance is approximate at city level. No external
+geocoder or silent IP inference is used.
+
+The material below is **historical Phase 1 planning**, retained only for context.
+Its bcrypt, stateless-logout, endpoint and response examples are superseded by the
+implementation and authoritative contracts linked above.
 
 This README serves as a guide for the frontend team, detailing the current architecture, environment setup, and the available Authentication & Identity APIs.
 

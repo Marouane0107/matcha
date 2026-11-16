@@ -1,31 +1,21 @@
-import { verifyToken } from '../utils/jwt.util.js';
-import { apiError, ERROR_CODES } from '../config/shared.js';
-import { pool } from '../config/db.js';
+import { authenticate } from '../services/session.js';
+import { authenticatedRateLimit } from './rate-limit.middleware.js';
 
-export const requireAuth = (req, res, next) => {
+export const requireAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json(apiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required'));
+      throw Object.assign(new Error('UNAUTHORIZED'), { statusCode: 401, errorCode: 'UNAUTHORIZED' });
     }
 
     const token = authHeader.split(' ')[1];
     if (!token) {
-      return res.status(401).json(apiError(ERROR_CODES.UNAUTHORIZED, 'Authentication token is missing'));
+      throw Object.assign(new Error('UNAUTHORIZED'), { statusCode: 401, errorCode: 'UNAUTHORIZED' });
     }
 
-    const decoded = verifyToken(token);
-    req.user = { id: decoded.id };
-
-    // Best-effort last_seen refresh, throttled to once per minute.
-    pool.query(
-      `UPDATE users SET last_seen = NOW()
-       WHERE id = $1 AND (last_seen IS NULL OR last_seen < NOW() - INTERVAL '1 minute')`,
-      [decoded.id]
-    ).catch(() => {});
-
-    next();
+    req.user = await authenticate(token);
+    authenticatedRateLimit(req, res, next);
   } catch (error) {
-    return res.status(401).json(apiError(ERROR_CODES.UNAUTHORIZED, 'Invalid or expired token'));
+    next(error);
   }
 };

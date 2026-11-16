@@ -4,9 +4,113 @@ A 42/1337 full-stack dating web application where users can create profiles,
 discover compatible users, like/connect with them, chat in real time, and receive
 real-time notifications.
 
-This repository currently contains the shared project foundation only. The React
-screen is a placeholder, and Express has no application routes. Authentication,
-database access, matching, uploads, chat, and notifications are not implemented.
+Authentication, profiles, protected photos, location, discovery, interactions,
+persisted chat, presence and notifications are implemented. See
+[the fix handoff](docs/INTRA_FIX_STATUS.md) for evidence and remaining submission
+limitations. The original [audit](docs/FINAL_AUDIT.md) is historical.
+
+## Current Setup
+
+Requirements: Node.js 22.20+, npm 10+, PostgreSQL 16+, and SMTP (a local Mailpit
+catcher works). The backend is JavaScript ESM checked by TypeScript, not a compiled
+TypeScript placeholder. Run these commands from the repository root:
+
+```sh
+npm ci
+cp frontend/.env.example frontend/.env
+cp backend/.env.example backend/.env
+npm run build --workspace=@matcha/shared
+```
+
+Configure backend `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`,
+`DB_NAME=matcha_dev`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and
+`CORS_ORIGIN`. Generate `JWT_SECRET` locally with at least 32 random bytes (for
+example `openssl rand -hex 32`); keep it private. Set `JWT_EXPIRES_IN=15m`.
+The backend uses `dotenv` in its workspace. No root environment file is needed.
+
+Explicitly create a **fresh local** database with your PostgreSQL administrator.
+These commands assume your `psql` connection targets the intended local host/user:
+
+```sh
+createdb matcha_dev
+psql -v ON_ERROR_STOP=1 -d matcha_dev -f backend/db/schema.sql
+npm run migrate --workspace=backend
+```
+
+For an existing database, back it up and run **only the additive migration**, not
+the fresh schema or reset script. PostgreSQL must allow `uuid-ossp`. The migration
+refuses conflicting unique data rather than silently deleting it.
+
+Seed 520 evaluation profiles only into this explicitly selected development DB:
+
+```sh
+NODE_ENV=development DB_CONFIRM_NAME=matcha_dev npm run seed --workspace=backend
+npm run dev
+```
+
+Seed/reset require a local host, `dev`/`test` in `DB_NAME`, and exact
+`DB_CONFIRM_NAME=DB_NAME`. Never run them against production. Set
+`SEED_DEFAULT_PASSWORD` locally before seeding. The development-only fallback is
+`MatchaSeed2026!`; the primary tester is `matcha_tester`. Picsum network access is
+needed for seeded photos; user uploads are private local WebP files.
+
+Frontend: <http://localhost:5173>. Backend: <http://localhost:3000/health>.
+Keep `CORS_ORIGIN`, `VITE_API_URL` (including `/api`) and `VITE_SOCKET_URL` aligned
+when changing ports. All mock flags must be false for integration/evaluation.
+Never place secrets in `VITE_*` variables.
+
+The backend starts from `backend/src/server.js`; its build checks JavaScript
+syntax. Shared declarations/runtime constants must be built first. Root dev
+watches shared, frontend and backend; workspace-only dev commands do not watch
+shared. Production hosting needs an SPA fallback and authenticated `/api` and
+Socket.IO forwarding over HTTPS.
+
+## Current Verification
+
+```sh
+npm ci
+npm run build
+npm run typecheck
+npm test --workspace=frontend
+npm test --workspace=backend
+npm run build --workspace=@matcha/shared
+git diff --check
+npm audit
+```
+
+Real integration tests additionally require a separately initialized **local test
+database**, SMTP capture and Mailpit's HTTP API. They create random accounts and
+retain their rows/uploads in that isolated DB:
+
+```sh
+NODE_ENV=test DB_HOST=127.0.0.1 DB_PORT=5432 DB_NAME=matcha_test \
+MAILPIT_API=http://127.0.0.1:8025 npm run test:integration --workspace=backend
+```
+
+Supply the matching test database/SMTP credentials in the backend environment.
+No production adapter falls back to mock data.
+
+## Current Behavior
+
+- Parameterized PostgreSQL queries only; no ORM. API/socket payloads follow shared
+  contracts and are validated by the existing frontend services.
+- Argon2id passwords, purpose-bound one-use email tokens, 15-minute memory-only
+  JWTs, persisted session versions and all-device revocation/disconnection.
+- Protected images, atomic five-photo limit, real matching/social operations,
+  persisted idempotent chat, notifications and multi-tab presence.
+- GPS is requested only after consent. Without GPS, users explicitly save a manual
+  city using an offline city dataset. Unknown/ambiguous cities are rejected;
+  region/country qualifiers disambiguate. Manual coordinates are city centroids,
+  including when a neighborhood label is provided. There is no silent IP inference
+  or external geocoding service.
+- Production builds eliminate explicit DEV-only mock adapters. Do not submit with
+  development mock flags enabled.
+
+## Historical Foundation Notes
+
+Everything below preserves the original Phase 0 planning and contributor notes,
+including its old tree and placeholder descriptions. It is **not current setup or
+implementation status**; use the sections above and the fix handoff for evaluation.
 
 ## Team
 
