@@ -3,7 +3,6 @@ ALTER TABLE tokens ADD COLUMN IF NOT EXISTS pending_email varchar(255);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS city varchar(255);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS neighborhood varchar(255);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS location_mode varchar(10) NOT NULL DEFAULT 'manual';
-ALTER TABLE profiles ALTER COLUMN location_mode TYPE varchar(16);
 UPDATE profiles SET city=location_string WHERE city IS NULL AND location_string IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_one_per_user ON profiles(user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_casefold ON users(lower(email));

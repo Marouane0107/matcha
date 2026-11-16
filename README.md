@@ -153,15 +153,11 @@ No production adapter falls back to mock data.
   JWTs, persisted session versions and all-device revocation/disconnection.
 - Protected images, atomic five-photo limit, real matching/social operations,
   persisted idempotent chat, notifications and multi-tab presence.
-- GPS is requested only after consent. After permission denial, if no location is
-   saved and no manual draft is being entered, the server attempts a coarse lookup
-   of the connection IPv4 using bundled offline data. No device GPS permission is
-   bypassed, no IP is sent to a third party, and the raw IP is not stored in profiles.
-   Approximate coordinates are rounded to 0.1 degree, owner-only, and marked
-   `approximate`. Existing saved locations are never replaced automatically.
-- Manual city/neighborhood correction remains available. Unknown/ambiguous cities
-   are rejected; region/country qualifiers disambiguate. Manual coordinates are city
-   centroids, including when a neighborhood label is provided.
+- GPS is requested only after consent. Without GPS, users explicitly save a manual
+  city using an offline city dataset. Unknown/ambiguous cities are rejected;
+  region/country qualifiers disambiguate. Manual coordinates are city centroids,
+  including when a neighborhood label is provided. There is no silent IP inference
+  or external geocoding service.
 - Production builds eliminate explicit DEV-only mock adapters. Do not submit with
   development mock flags enabled.
 
@@ -188,33 +184,24 @@ No production adapter falls back to mock data.
    bearer token fails. Verify password recovery, and repeat with current Chrome
    and Firefox and a narrow mobile viewport.
 
-## Subject Limits
+## Subject Verification
 
-The assigned Intra subject (reported version 6.1) remains unavailable. Complete
-subject compliance is **not certified**. The available
-[version 5.1 mirror](https://raw.githubusercontent.com/42-matcha-dev/42-matcha/develop/project/en.subject.pdf),
-IV.2, requires an alternative approximate location when GPS is declined,
-"even without their explicit consent." It does not prescribe IP as the technology.
-The permission-denial fallback implements that available mandatory requirement on
-supported public IPv4 connections; exact assigned-version compliance is unverified.
+The supplied official v6.1 section IV.2 requires GPS with consent or, when refused,
+an explicit approximate city/neighborhood before matching. Users can edit it later.
+The application follows that rule: discovery is gated on a saved location, manual
+city/neighborhood editing persists, and no automatic IP localization is performed.
+The older 5.1 automatic-localization interpretation does not apply to v6.1.
 
-IP lookup is best-effort: loopback/private/reserved IPs, native IPv6, missing or
-unmapped data return `422 LOCATION_REQUIRED` without inventing a location. Manual
-entry remains usable. Only `req.socket.remoteAddress` is used; forwarded headers
-are intentionally ignored. A localhost or private reverse proxy therefore cannot
-provide the user's public address to this implementation. Do not enable broad
-proxy-header trust to hide that limitation. Test public-connection deployment
-before submission; proxy/IPv6 coverage remains a limitation.
+The full official v6.1 PDF is not stored in this repository; only the supplied
+location excerpt and mandatory checklist have been available for this comparison.
+Do not infer independent verification of any unseen clauses. Firefox must be
+exercised on a host with its runtime dependencies; a Chromium pass does not
+establish Firefox compatibility.
 
-The pinned MIT-licensed `fast-geoip` package includes local GeoLite-derived data
-(about 158 MiB installed). This product includes GeoLite data created by MaxMind,
-available from <https://www.maxmind.com/>. IP datasets can be stale or inaccurate;
-keep the pinned provider/data reviewed and allow manual correction. No lookup
-request or data download occurs at runtime. Rerun the additive migration before
-starting an existing database: it widens the source-mode column for `approximate`.
-
-Firefox must be exercised on a host with its runtime dependencies; a Chromium pass
-does not establish Firefox compatibility.
+Dictionary-password rejection uses pinned MIT-licensed `word-list@4.1.0` English
+data plus the project's common-password patterns, loaded locally at startup.
+Single dictionary words with predictable numeric/punctuation wrappers are rejected;
+the dictionary is not a guarantee against all breached or weak passphrases.
 
 ## Reference
 

@@ -34,7 +34,6 @@ const position = (accuracy = 30) => ({ coords: { latitude: 33.58, longitude: -7.
 async function mount(context, service = createMockProfileService(0)) {
   const requests = [];
   Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
-  Object.defineProperty(window.navigator, "permissions", { configurable: true, value: undefined });
   Object.defineProperty(window.navigator, "geolocation", { configurable: true, value: { getCurrentPosition: (success, error, options) => requests.push({ success, error, options }) } });
   const router = createMemoryRouter([{ path: "/profile/location", element: createElement(LocationPage) }, { path: "*", element: createElement("p", null, "Profile") }], { initialEntries: ["/profile", "/profile/location"], initialIndex: 1 });
   const root = createRoot(document.getElementById("root"));
@@ -79,98 +78,6 @@ for (const [code, message] of [[1, "permission was denied"], [2, "position is un
     assert(button("Confirm and save location").disabled);
   });
 }
-
-test("permission denial automatically saves a coarse fallback and permits manual correction", async context => {
-  const mock = createMockProfileService(0);
-  let location = null;
-  let calls = 0;
-  const service = { ...mock,
-    me: async value => ({ ...await mock.me(value), location }),
-    approximateLocation: async value => { calls++; location = { mode: "approximate", city: "France", neighborhood: null, latitude: 48.9, longitude: 2.4 }; return service.me(value); },
-    updateLocation: async (request, value) => { const updated = await mock.updateLocation(request, value); location = updated.location; return updated; },
-  };
-  const { requests } = await mount(context, service);
-  await startGPS();
-  await act(async () => { requests[0].error({ code: 1 }); await flush(); });
-  await act(flush);
-  await act(flush);
-  assert.equal(calls, 1); assert.equal(requests.length, 1);
-  assert(text().includes("Approximate area saved"), text());
-  assert.equal(document.querySelector('input[name="city"]').value, "France");
-  assert(!text().includes("48.9")); assert(!text().includes("2.4"));
-  await input("city", "Rabat"); await input("neighborhood", "Agdal");
-  await click(button("Save location"));
-  await act(flush);
-  assert.equal((await service.me(token)).location.mode, "manual");
-  assert.equal((await service.me(token)).location.city, "Rabat");
-  assert.equal((await service.me(token)).location.neighborhood, "Agdal");
-});
-
-test("fallback failure preserves manual entry and does not retry device geolocation", async context => {
-  const mock = createMockProfileService(0);
-  let calls = 0;
-  const { requests } = await mount(context, { ...mock, approximateLocation: async () => { calls++; throw Error("No public IP match"); } });
-  await startGPS();
-  await act(async () => { requests[0].error({ code: 1 }); await flush(); });
-  assert(text().includes("Approximate location is unavailable"));
-  assert.equal(calls, 1); assert.equal(requests.length, 1);
-  assert.equal((await mock.me(token)).location, null);
-  await click(document.querySelectorAll('input[name="location-method"]')[1]);
-  await input("city", "Paris"); await click(button("Save location"));
-  await act(flush);
-  assert.equal((await mock.me(token)).location.city, "Paris");
-});
-
-test("known denied permission triggers fallback without another device-position request", async context => {
-  const mock = createMockProfileService(0);
-  let calls = 0;
-  const { requests } = await mount(context, { ...mock, approximateLocation: async () => { calls++; throw Error("No public IP"); } });
-  Object.defineProperty(window.navigator, "permissions", { configurable: true, value: { query: async () => ({ state: "denied" }) } });
-  await startGPS(); await act(flush);
-  assert.equal(requests.length, 0); assert.equal(calls, 1);
-  assert(text().includes("permission was denied"));
-  assert(text().includes("Approximate location is unavailable"));
-});
-
-test("late fallback cannot overwrite an in-progress manual correction", async context => {
-  const mock = createMockProfileService(0);
-  let finish;
-  const { requests } = await mount(context, { ...mock, approximateLocation: () => new Promise(resolve => { finish = resolve; }) });
-  await startGPS();
-  await act(async () => { requests[0].error({ code: 1 }); await flush(); });
-  await click(document.querySelectorAll('input[name="location-method"]')[1]);
-  await input("city", "Rabat");
-  await act(async () => finish({ ...await mock.me(token), location: { mode: "approximate", city: "France", neighborhood: null, latitude: 48.9, longitude: 2.4 } }));
-  assert.equal(document.querySelector('input[name="city"]').value, "Rabat");
-  await click(button("Save location"));
-  await act(flush);
-  assert.equal((await mock.me(token)).location.city, "Rabat");
-});
-
-test("saved locations are never automatically replaced after GPS denial", async context => {
-  const mock = createMockProfileService(0);
-  await mock.updateLocation({ mode: "manual", city: "Paris", neighborhood: null }, token);
-  let calls = 0;
-  const { requests } = await mount(context, { ...mock, approximateLocation: async () => { calls++; throw Error("Must not run"); } });
-  await startGPS(); await act(async () => requests[0].error({ code: 1 }));
-  assert.equal(calls, 0); assert.equal((await mock.me(token)).location.city, "Paris");
-});
-
-test("real fallback adapter sends no client IP or coordinates and keeps them out of public profiles", async () => {
-  const mock = createMockProfileService(0);
-  const owner = { ...await mock.me(token), location: { mode: "approximate", city: "France", neighborhood: null, latitude: 48.9, longitude: 2.4 } };
-  const calls = [];
-  const real = createRealProfileService(createApiClient("https://api.example.invalid/api", undefined, async (url, options) => {
-    calls.push({ url, options });
-    return new Response(JSON.stringify({ success: true, data: owner, error: null }), { headers: { "Content-Type": "application/json" } });
-  }));
-  assert.equal((await real.approximateLocation(token)).location.mode, "approximate");
-  assert.equal(calls[0].url.pathname, "/api/profile/location/approximate");
-  assert.equal(calls[0].options.method, "POST"); assert.equal(calls[0].options.body, undefined);
-  assert.equal(calls[0].options.headers.get("Authorization"), `Bearer ${token}`);
-  const publicProfile = await mock.publicProfile("demo", token);
-  assert(!isPublicProfile({ ...publicProfile, location: owner.location }));
-});
 
 test("unsupported and insecure contexts offer manual entry without GPS calls", async context => {
   const { requests } = await mount(context);

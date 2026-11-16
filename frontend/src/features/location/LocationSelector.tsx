@@ -14,7 +14,7 @@ export default function LocationSelector({ profile, onSaved }: { profile: UserPr
   const service = useProfileService();
   const { accessToken } = useAuth();
   const gps = useGeolocation();
-  const [mode, setMode] = useState<LocationMode>(profile.location?.mode === "gps" ? "gps" : "manual");
+  const [mode, setMode] = useState<LocationMode>(profile.location?.mode ?? "manual");
   const [city, setCity] = useState(profile.location?.city ?? "");
   const [neighborhood, setNeighborhood] = useState(profile.location?.neighborhood ?? "");
   const [consent, setConsent] = useState(false);
@@ -22,26 +22,10 @@ export default function LocationSelector({ profile, onSaved }: { profile: UserPr
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [fallback, setFallback] = useState(profile.location?.mode === "approximate" ? "Approximate area saved. You can correct your city and neighborhood." : "");
-  const fallbackAttempted = useRef(false);
   const active = useRef(true);
   const saving = useRef(false);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
-  useEffect(() => {
-    if (!gps.denied || profile.location || !accessToken || city.trim() || neighborhood.trim() || fallbackAttempted.current) return;
-    fallbackAttempted.current = true;
-    let current = true;
-    setFallback("Finding an approximate area...");
-    void service.approximateLocation(accessToken).then(updated => {
-      if (!current || !active.current) return;
-      if (!updated.location) throw new Error("Location unavailable");
-      setCity(updated.location.city); setNeighborhood(updated.location.neighborhood ?? "");
-      setMode("manual"); setSaved(true); gps.clear(); onSaved();
-      setFallback("Approximate area saved. You can correct your city and neighborhood.");
-    }).catch(() => { if (current && active.current) setFallback("Approximate location is unavailable. Enter your city manually."); });
-    return () => { current = false; };
-  }, [gps.denied, profile.location, accessToken, city, neighborhood, service]);
-  const dirty = !saved && (city !== (profile.location?.city ?? "") || neighborhood !== (profile.location?.neighborhood ?? "") || Boolean(profile.location && mode !== (profile.location.mode === "gps" ? "gps" : "manual")) || gps.position !== null);
+  const dirty = !saved && (city !== (profile.location?.city ?? "") || neighborhood !== (profile.location?.neighborhood ?? "") || Boolean(profile.location && mode !== profile.location.mode) || gps.position !== null);
   const blocker = useBlocker(Boolean(accessToken) && (dirty || busy));
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { if (blocker.state === "blocked") dialog.current?.showModal(); else dialog.current?.close(); }, [blocker.state]);
@@ -74,8 +58,7 @@ export default function LocationSelector({ profile, onSaved }: { profile: UserPr
       <h2 id="location-discard-title">Leave without saving?</h2><p>{busy ? "A save is in progress. Leaving cannot cancel a request already sent." : "Your location changes have not been saved."}</p>
       <button type="button" autoFocus className="secondary" onClick={() => { if (blocker.state === "blocked") blocker.reset(); }}>Stay on this page</button>{" "}<button type="button" className="primary compact" onClick={() => { if (blocker.state === "blocked") blocker.proceed(); }}>Discard changes</button>
     </dialog>
-    <p className="notice">Your city and neighborhood can appear on your profile. Exact coordinates stay private. If GPS is denied and no area is saved, your connection IP is used locally for a coarse estimate, without requesting device location.</p>
-    {fallback && <p role="status" className="notice">{fallback}</p>}
+    <p className="notice">Your city and neighborhood can appear on your profile. Exact coordinates stay private and help find people nearby.</p>
     <form className="profile-form" onSubmit={event => void submit(event)} noValidate aria-busy={busy}>
       <fieldset disabled={busy}>
         <legend>Choose your location method</legend>
