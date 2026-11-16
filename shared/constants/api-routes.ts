@@ -18,6 +18,7 @@ export const API_ROUTES = {
     PICTURE: "/api/profile/pictures/:pictureId",
     MAIN_PICTURE: "/api/profile/pictures/:pictureId/main",
     LOCATION: "/api/profile/location",
+    APPROXIMATE_LOCATION: "/api/profile/location/approximate",
     TAGS: "/api/tags",
   },
   BROWSE: { SUGGESTIONS: "/api/profiles/suggestions" },

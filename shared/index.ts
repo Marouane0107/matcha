@@ -1,3 +1,4 @@
+export { LOCATION_CATALOG } from './constants/locations';
 export * from "./contracts/api.types";
 export * from "./contracts/auth.types";
 export * from "./contracts/profile.types";

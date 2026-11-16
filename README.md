@@ -4,302 +4,226 @@ A 42/1337 full-stack dating web application where users can create profiles,
 discover compatible users, like/connect with them, chat in real time, and receive
 real-time notifications.
 
-This repository currently contains the shared project foundation only. The React
-screen is a placeholder, and Express has no application routes. Authentication,
-database access, matching, uploads, chat, and notifications are not implemented.
+Authentication, profiles, protected photos, location, discovery, interactions,
+persisted chat, presence and notifications are implemented. The backend uses
+parameterized raw PostgreSQL queries with no ORM. See Subject Limits below before
+claiming compliance with the assigned Intra subject.
 
-## Team
+## Requirements and Installation
 
-| Developer | Role | Ownership |
-| --- | --- | --- |
-| Marouane | Frontend & Realtime Client | React, UI/UX, responsive design, authentication screens, profile/browse/search UI, filters/sorting, image upload UI, GPS/location UI, chat/notifications UI, Socket.IO client, API integration |
-| Oussama | Backend & Core | Express, PostgreSQL, raw SQL, authentication, email verification/password reset, profiles API, matching, search/filter/sort, likes/connections, blocks/reports, upload security, location, Socket.IO server, chat persistence, notifications, seeding 500+ profiles |
-
-Phase 0 contracts are finalized for implementation. Both developers review any
-subsequent contract changes in a focused pull request.
-
-## Tech Stack
-
-- Frontend: React + Vite + TypeScript, React Router.
-- Backend: Node.js + Express + TypeScript.
-- Database: PostgreSQL with raw SQL via `pg`. No ORM.
-- Realtime: Socket.IO server and client, installed but not connected yet.
-- Tooling: npm workspaces, TypeScript, Vite, tsx, concurrently.
-
-## Architecture
-
-```text
-Frontend (Marouane)
-    | REST API + WebSocket
-    v
-Backend (Oussama)
-    | Parameterized raw SQL
-    v
-PostgreSQL
-```
-
-The frontend never accesses the database directly. The `@matcha/shared` npm
-workspace contains only cross-workspace contracts and constants, not server logic
-or credentials. `frontend/src/services/api/` will own HTTP transport;
-`frontend/src/api/` will own typed endpoint adapters. Only contract exports exist
-today; there are no requests, socket connections, or feature implementations.
-
-## Development Setup
-
-Requirements: Node.js 22.20+ and npm 10+. PostgreSQL is needed for future database
-work, but the current placeholder server does not connect to it.
-
-Replace `<repository-url>` with the team's Git remote:
+Requirements: Node.js 22.20+, npm 10+, PostgreSQL 16+, and SMTP (a local Mailpit
+catcher works). PostgreSQL CLI tools (`createdb`, `psql`) are needed for the database
+commands below. The backend is JavaScript ESM checked by TypeScript. Run these
+commands from the repository root:
 
 ```sh
-git clone <repository-url> matcha
-cd matcha
-npm install
+npm ci
 cp frontend/.env.example frontend/.env
 cp backend/.env.example backend/.env
+npm run build --workspace=@matcha/shared
+```
+
+Do not overwrite existing local environment files. Install dependencies only at
+the root using the single committed lockfile.
+
+Configure backend `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`,
+`DB_NAME=matcha_dev`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and
+`CORS_ORIGIN`. Generate `JWT_SECRET` locally with at least 32 random bytes (for
+example `openssl rand -hex 32`); keep it private. Set `JWT_EXPIRES_IN=15m`.
+The backend uses `dotenv` in its workspace. No root environment file is needed.
+
+Configure `frontend/.env` with `VITE_API_URL=http://localhost:3000/api` and
+`VITE_SOCKET_URL=http://localhost:3000`. Leave every `VITE_*_MOCK` flag `false`.
+Set backend `PORT=3000`, `NODE_ENV=development` and
+`CORS_ORIGIN=http://localhost:5173` for those defaults. Use your own credentials;
+never commit `.env` files, signing secrets, tokens or passwords.
+
+## Database and Seed
+
+Explicitly create a **fresh local** database with your PostgreSQL administrator.
+These commands use your PostgreSQL CLI connection (`PGHOST`, `PGPORT`, `PGUSER`
+and local password configuration). Point it at the same server/user as backend
+`DB_*`, and set backend `DB_NAME=matcha_dev` before migration:
+
+```sh
+createdb matcha_dev
+psql -v ON_ERROR_STOP=1 -d matcha_dev -f backend/db/schema.sql
+npm run migrate --workspace=backend
+```
+
+For an existing database, back it up and run **only the additive migration**, not
+the fresh schema or reset script. PostgreSQL must allow `uuid-ossp`. The migration
+refuses conflicting unique data rather than silently deleting it.
+
+Configure a private `SEED_DEFAULT_PASSWORD` locally, then seed 520 evaluation
+profiles only into this explicitly selected development database:
+
+```sh
+NODE_ENV=development DB_CONFIRM_NAME=matcha_dev npm run seed --workspace=backend
+psql -v ON_ERROR_STOP=1 -d matcha_dev -c 'SELECT count(*), count(DISTINCT user_id) FROM profiles;'
+```
+
+Seed/reset require a local host, `dev`/`test` in `DB_NAME`, and exact
+`DB_CONFIRM_NAME=DB_NAME`. Never run them against production. The primary tester
+is `matcha_tester`; its password is your locally configured seed password. Run the
+seed once on a fresh database; repeating it causes duplicate-user errors rather
+than updating existing accounts. Picsum network access is needed for seeded photos; user uploads are private
+local WebP files. Keep uploaded files together with their database.
+
+## Startup and Email
+
+```sh
 npm run dev
 ```
 
-Copy `frontend/.env.example` to `frontend/.env` and `backend/.env.example` to
-`backend/.env`. No root `.env` is needed. Example files contain no credentials.
-The backend loads its local environment file using Node's native env-file support.
-Every `VITE_` variable is public browser configuration: never put secrets there.
+Frontend: <http://localhost:5173>. Backend: <http://localhost:3000/health>.
+Keep `CORS_ORIGIN`, `VITE_API_URL` (including `/api`) and `VITE_SOCKET_URL` aligned
+when changing ports. All mock flags must be false for integration/evaluation.
+Never place secrets in `VITE_*` variables.
 
-Frontend: <http://localhost:5173>. Backend: <http://localhost:3000>. A backend 404 is
-expected because no routes exist. Vite chooses another port if 5173 is occupied;
-update `FRONTEND_URL` when changing the frontend origin. If port 3000 is occupied,
-change `PORT` and both frontend URLs consistently.
+Configure SMTP before registering. For a local Mailpit catcher, the usual ports
+are SMTP `1025` and HTTP `8025`; use the ports actually configured on your machine.
+Set `SMTP_HOST`, `SMTP_PORT`, a synthetic sender address in `SMTP_USER`, and leave
+`SMTP_PASSWORD` set to your own non-empty disposable local credential. Configure
+the catcher to accept those credentials (Mailpit supports accepting arbitrary local
+SMTP authentication). The backend always supplies SMTP authentication; a blank
+password fails against a server advertising AUTH. For a provider, use its actual
+SMTP credentials. Port `465` enables implicit TLS. `SMTP_USER` also supplies the
+sender address. No external mailbox is needed with a local catcher.
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Build shared, then watch shared and start frontend/backend; Ctrl+C stops all |
-| `npm run dev:frontend` | Build shared, then start Vite |
-| `npm run dev:backend` | Build shared, then start Express with tsx watch mode |
-| `npm run build` | Build shared first, frontend second, backend last |
-| `npm run typecheck` | Build shared declarations, then check all three workspaces |
-| `npm run install:all` | Install all three workspaces from the root |
-| `npm ci` | Reproduce the committed root lockfile |
-| `npm run start --workspace=backend` | Run the compiled backend after building |
+Open verification/reset/email-change links in the catcher's web UI. They target
+`CORS_ORIGIN` with a fragment token; the frontend removes it from browser history.
 
-Use a single root lockfile. No separate installation in each workspace is needed.
-Tests and lint tooling are not configured yet; use build/typecheck as the initial
-checks, and add focused tests with each implemented feature.
+The backend starts from `backend/src/server.js`; its build checks JavaScript
+syntax. Shared declarations/runtime constants must be built first. Root dev
+watches shared, frontend and backend; workspace-only dev commands do not watch
+shared. Production hosting needs an SPA fallback and authenticated `/api` and
+Socket.IO forwarding over HTTPS.
 
-### Shared Contracts
+For deployment, run `NODE_ENV=production npm run build`, serve `frontend/dist`
+with SPA fallback, and run `NODE_ENV=production npm start --workspace=backend`.
+Do not build a release with `NODE_ENV=test` or `development`: Vite then enables
+development behavior, including explicitly enabled test mocks.
+Workspace-only development commands are
+`npm run dev:frontend` and `npm run dev:backend`. After adding shared runtime
+exports, rebuild shared and restart Vite with
+`npm run dev --workspace=frontend -- --force` to clear stale prebundles.
 
-Use package imports everywhere in frontend/backend, never relative paths into
-shared source:
+## Verification
 
-```ts
-import type { ApiResponse, UserProfile } from "@matcha/shared";
-import { API_ROUTES, SOCKET_EVENTS, ERROR_CODES } from "@matcha/shared";
+```sh
+npm ci
+npm run build
+npm run typecheck
+npm test --workspace=frontend
+npm test --workspace=backend
+npm run build --workspace=@matcha/shared
+git diff --check
+npm audit
 ```
 
-The shared package emits CommonJS runtime constants and TypeScript declarations
-to shared/dist. Vite explicitly handles this linked CommonJS workspace; Node uses
-its package exports directly. Root build order is shared, frontend, backend.
-Backend output now starts at backend/dist/server.js. Run root build before using
-workspace-only production scripts. The root dev command watches shared; standalone
-frontend/backend dev commands rebuild shared once, so rebuild it after contract edits.
-After changing runtime constants, restart Vite with `npm run dev --workspace=frontend
--- --force` to invalidate its prebundled dependency cache. The shared watcher alone
-is not a guarantee that Vite's optimized dependency cache has refreshed.
+Root build/typecheck cover every workspace. Real integration tests additionally
+require a separately initialized **local test database**, SMTP capture and
+Mailpit's HTTP API. With your local PostgreSQL CLI connection configured:
 
-Interfaces are contracts, not runtime validators. IDs are UUID strings; instants
-are ISO 8601 UTC strings. UserProfile is owner-only; PublicProfile omits email,
-birth date and exact coordinates. Auth uses memory-only bearer JWTs, 15-minute
-expiry, no refresh tokens and all-device logout. See the final docs below.
-
-## Start Coding
-
-- Marouane: [frontend start guide](docs/MAROUANE_START_HERE.md), branch `feat/auth-ui`.
-- Oussama: [backend start guide](docs/OUSSAMA_BACKEND_GUIDE.md), branch
-  `feat/database-foundation`, then `feat/auth-api`.
-- Both: [parallel development](docs/PARALLEL_DEVELOPMENT.md) and the
-  [Phase 0 readiness checklist](docs/PHASE_0_CHECKLIST.md).
-
-### Manual Configuration
-
-- Oussama: provision PostgreSQL 16+ and a least-privilege database user when Phase 1
-  starts. Fill local DB values and follow the documented migration workflow.
-- Oussama: configure a local JWT secret and email provider before implementing
-  authentication. Those values are unused by the current server.
-- Marouane: keep public API/socket URLs consistent with the backend address.
-- Both: review Phase 0 and configure GitHub main-branch protection requiring
-  a pull request and review from the other developer. CI is not configured yet.
-
-The frontend env template contains only VITE_API_URL and VITE_SOCKET_URL. The
-backend template defines PORT, NODE_ENV, DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD,
-JWT_SECRET, JWT_EXPIRES_IN, EMAIL_HOST/EMAIL_PORT/EMAIL_USER/EMAIL_PASSWORD and
-FRONTEND_URL. JWT_EXPIRES_IN=15m is a non-secret policy default; credential fields
-remain blank. PostgreSQL defaults to localhost:5432, database matcha. SMTP and
-startup-validation requirements are in the backend guide. VITE_API_URL includes
-/api, while route constants already contain /api: adapters resolve against its
-origin, not by concatenating two prefixes. No secret belongs in a VITE_ variable.
-
-## Git Workflow
-
-Nobody works directly on `main`. Use a small branch per feature, never permanent
-frontend/backend branches.
-
-Frontend examples: `feat/auth-ui`, `feat/profile-ui`, `feat/browse-ui`, `feat/chat-ui`.
-Backend examples: `feat/database-foundation`, `feat/auth-api`, `feat/profile-api`,
-`feat/matching-api`, `feat/socket-server`.
-
-```text
-main -> feature branch -> commit -> push -> pull request
-     -> review by the other developer -> merge to main
+```sh
+createdb matcha_test
+psql -v ON_ERROR_STOP=1 -d matcha_test -f backend/db/schema.sql
+NODE_ENV=test DB_HOST=127.0.0.1 DB_NAME=matcha_test npm run migrate --workspace=backend
+NODE_ENV=test DB_HOST=127.0.0.1 DB_NAME=matcha_test npm run migrate --workspace=backend
+NODE_ENV=test DB_HOST=127.0.0.1 DB_NAME=matcha_test \
+MAILPIT_API=http://127.0.0.1:8025 npm run test:integration --workspace=backend
 ```
 
-See [Git workflow](docs/GIT_WORKFLOW.md) for commands and review expectations.
+Supply matching `DB_PORT`, database credentials and SMTP catcher values in the
+backend environment or command environment; override `MAILPIT_API` for its actual
+HTTP port. The suite rejects non-local/non-test database targets, starts its own
+ephemeral API and uses real HTTP, PostgreSQL, SMTP and Socket.IO. It creates random
+accounts and retains rows/uploads in the isolated DB. No reset is needed.
 
-## Security
+All tests and their development mocks/fixtures are intentionally retained. The
+frontend suite verifies production exclusion even with mock flags set true.
+No production adapter falls back to mock data.
 
-Never commit:
+## Current Behavior
 
-- `.env` files (only credential-free `.env.example` templates belong in Git).
-- API keys.
-- Passwords.
-- Database credentials.
-- JWT secrets.
-- Email credentials.
+- Parameterized PostgreSQL queries only; no ORM. API/socket payloads follow shared
+  contracts and are validated by the existing frontend services.
+- Argon2id passwords, purpose-bound one-use email tokens, 15-minute memory-only
+  JWTs, persisted session versions and all-device revocation/disconnection.
+- Protected images, atomic five-photo limit, real matching/social operations,
+  persisted idempotent chat, notifications and multi-tab presence.
+- GPS is requested only after consent. After permission denial, if no location is
+   saved and no manual draft is being entered, the server attempts a coarse lookup
+   of the connection IPv4 using bundled offline data. No device GPS permission is
+   bypassed, no IP is sent to a third party, and the raw IP is not stored in profiles.
+   Approximate coordinates are rounded to 0.1 degree, owner-only, and marked
+   `approximate`. Existing saved locations are never replaced automatically.
+- Manual city/neighborhood correction remains available. Unknown/ambiguous cities
+   are rejected; region/country qualifiers disambiguate. Manual coordinates are city
+   centroids, including when a neighborhood label is provided.
+- Production builds eliminate explicit DEV-only mock adapters. Do not submit with
+  development mock flags enabled.
 
-Uploads, dependencies, and build output are ignored. Review staged changes before
-every commit. Use prepared/parameterized queries, never interpolated SQL. Prisma,
-Sequelize, TypeORM, Drizzle, Mongoose, and all other ORMs are prohibited.
+## Two-Account Evaluation
 
-## Documentation
+1. Open two independent browser sessions (separate profiles or a private window),
+   with all mock flags false. Register two accounts with your own passwords and
+   verify their email links in the SMTP catcher. Alternatively use `matcha_tester`
+   and `kevin_beer_1` with your local seed password; seeded peers start connected
+   and do not exercise initial registration/likes.
+2. Complete new profiles: names, adult birth date, gender, biography, at least one
+   interest, saved location and a main photo. Choose compatible preferences such
+   as `everyone`. Confirm protected picture rendering; anonymous picture requests
+   must fail.
+3. Search for each other or open `/profiles/<username>` while logged in. Check
+   profile visits and notifications, then like in both directions to connect.
+4. Open Messages and exchange messages both ways. Check notifications outside the
+   conversation, mark them read, and reopen history. Reloading requires login
+   again because access tokens live only in memory.
+5. Unlike one account: chat/history must be denied until both like again. Block
+   the peer: profile/photo/chat access and notifications from the peer must be
+   restricted. Unblocking must not restore likes or the connection.
+6. Log out and confirm all devices/sockets for that account are revoked and an old
+   bearer token fails. Verify password recovery, and repeat with current Chrome
+   and Firefox and a narrow mobile viewport.
 
-- [Final API contract and validation](docs/API_CONTRACT.md)
-- [Auth strategy](docs/AUTH_STRATEGY.md)
-- [Final database design](docs/DATABASE_SCHEMA.md)
-- [Socket event dictionary](docs/SOCKET_EVENTS.md)
+## Subject Limits
+
+The assigned Intra subject (reported version 6.1) remains unavailable. Complete
+subject compliance is **not certified**. The available
+[version 5.1 mirror](https://raw.githubusercontent.com/42-matcha-dev/42-matcha/develop/project/en.subject.pdf),
+IV.2, requires an alternative approximate location when GPS is declined,
+"even without their explicit consent." It does not prescribe IP as the technology.
+The permission-denial fallback implements that available mandatory requirement on
+supported public IPv4 connections; exact assigned-version compliance is unverified.
+
+IP lookup is best-effort: loopback/private/reserved IPs, native IPv6, missing or
+unmapped data return `422 LOCATION_REQUIRED` without inventing a location. Manual
+entry remains usable. Only `req.socket.remoteAddress` is used; forwarded headers
+are intentionally ignored. A localhost or private reverse proxy therefore cannot
+provide the user's public address to this implementation. Do not enable broad
+proxy-header trust to hide that limitation. Test public-connection deployment
+before submission; proxy/IPv6 coverage remains a limitation.
+
+The pinned MIT-licensed `fast-geoip` package includes local GeoLite-derived data
+(about 158 MiB installed). This product includes GeoLite data created by MaxMind,
+available from <https://www.maxmind.com/>. IP datasets can be stale or inaccurate;
+keep the pinned provider/data reviewed and allow manual correction. No lookup
+request or data download occurs at runtime. Rerun the additive migration before
+starting an existing database: it widens the source-mode column for `approximate`.
+
+Firefox must be exercised on a host with its runtime dependencies; a Chromium pass
+does not establish Firefox compatibility.
+
+## Reference
+
+- [API contracts](docs/API_CONTRACT.md)
+- [Authentication strategy](docs/AUTH_STRATEGY.md)
+- [Database design](docs/DATABASE_SCHEMA.md) and executable [schema](backend/db/schema.sql)
+- [Socket events](docs/SOCKET_EVENTS.md)
 - [Git workflow](docs/GIT_WORKFLOW.md)
-- [Project roadmap](docs/PROJECT_ROADMAP.md)
-- [Script policy](scripts/README.md)
+- [Script safety](scripts/README.md)
 
-## Repository Tree and File Inventory
-
-All files below are foundation files. `.gitkeep` files retain placeholder
-directories in Git. Generated `node_modules/` and `dist/` are omitted. The final
-Phase 0 change inventory is recorded in [the checklist](docs/PHASE_0_CHECKLIST.md).
-
-```text
-matcha/
-|-- .editorconfig
-|-- .env.example
-|-- .gitignore
-|-- README.md
-|-- package.json
-|-- package-lock.json
-|-- frontend/
-|   |-- .env.example
-|   |-- index.html
-|   |-- package.json
-|   |-- tsconfig.json
-|   |-- vite.config.ts
-|   |-- public/
-|   |   `-- .gitkeep
-|   `-- src/
-|       |-- App.tsx
-|       |-- main.tsx
-|       |-- api/
-|       |   `-- .gitkeep
-|       |-- assets/
-|       |   `-- .gitkeep
-|       |-- components/
-|       |   `-- .gitkeep
-|       |-- features/
-|       |   |-- auth/
-|       |   |   `-- .gitkeep
-|       |   |-- profile/
-|       |   |   `-- .gitkeep
-|       |   |-- browse/
-|       |   |   `-- .gitkeep
-|       |   |-- search/
-|       |   |   `-- .gitkeep
-|       |   |-- chat/
-|       |   |   `-- .gitkeep
-|       |   `-- notifications/
-|       |       `-- .gitkeep
-|       |-- hooks/
-|       |   `-- .gitkeep
-|       |-- layouts/
-|       |   `-- .gitkeep
-|       |-- pages/
-|       |   `-- .gitkeep
-|       |-- services/
-|       |   |-- api/
-|       |   |   |-- contracts.ts
-|       |   |   `-- .gitkeep
-|       |   `-- socket/
-|       |       `-- .gitkeep
-|       |-- store/
-|       |   `-- .gitkeep
-|       |-- types/
-|       |   `-- .gitkeep
-|       `-- utils/
-|           `-- .gitkeep
-|-- backend/
-|   |-- .env.example
-|   |-- package.json
-|   |-- tsconfig.json
-|   |-- uploads/
-|   |   `-- .gitkeep
-|   `-- src/
-|       |-- app.ts
-|       |-- server.ts
-|       |-- config/
-|       |   |-- contracts.ts
-|       |   `-- .gitkeep
-|       |-- controllers/
-|       |   `-- .gitkeep
-|       |-- db/
-|       |   |-- migrations/
-|       |   |   `-- .gitkeep
-|       |   |-- queries/
-|       |   |   `-- .gitkeep
-|       |   `-- seed/
-|       |       `-- .gitkeep
-|       |-- middleware/
-|       |   `-- .gitkeep
-|       |-- routes/
-|       |   `-- .gitkeep
-|       |-- services/
-|       |   `-- .gitkeep
-|       |-- sockets/
-|       |   `-- .gitkeep
-|       |-- types/
-|       |   `-- .gitkeep
-|       `-- utils/
-|           `-- .gitkeep
-|-- shared/
-|   |-- package.json
-|   |-- tsconfig.json
-|   |-- index.ts
-|   |-- contracts/
-|   |   |-- api.types.ts
-|   |   |-- auth.types.ts
-|   |   |-- profile.types.ts
-|   |   |-- search.types.ts
-|   |   |-- interaction.types.ts
-|   |   |-- chat.types.ts
-|   |   `-- notification.types.ts
-|   `-- constants/
-|       |-- api-routes.ts
-|       |-- error-codes.ts
-|       `-- socket-events.ts
-|-- docs/
-|   |-- API_CONTRACT.md
-|   |-- AUTH_STRATEGY.md
-|   |-- DATABASE_SCHEMA.md
-|   |-- SOCKET_EVENTS.md
-|   |-- GIT_WORKFLOW.md
-|   |-- MAROUANE_START_HERE.md
-|   |-- OUSSAMA_BACKEND_GUIDE.md
-|   |-- PARALLEL_DEVELOPMENT.md
-|   |-- PHASE_0_CHECKLIST.md
-|   `-- PROJECT_ROADMAP.md
-`-- scripts/
-    `-- README.md
-```
+Frontend feature handoffs retain useful test/mocking guidance. Local audit reports
+are deliberately excluded from submission; installation does not depend on them.

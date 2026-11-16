@@ -6,15 +6,27 @@ export function useGeolocation() {
   const [position, setPosition] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [denied, setDenied] = useState(false);
   useEffect(() => () => { generation.current += 1; }, []);
-  function clear() { generation.current += 1; setPosition(null); setLoading(false); setError(""); }
-  function request() {
+  function clear() { generation.current += 1; setPosition(null); setLoading(false); setError(""); setDenied(false); }
+  async function request() {
     clear();
     if (!window.isSecureContext) { setError("GPS requires a secure connection. Use HTTPS or enter your location manually."); return; }
     if (!window.navigator.geolocation) { setError("This browser does not support GPS. Enter your location manually."); return; }
     const current = generation.current;
     setLoading(true);
     try {
+      if (window.navigator.permissions) {
+        try {
+          const permission = await window.navigator.permissions.query({ name: "geolocation" });
+          if (current !== generation.current) return;
+          if (permission.state === "denied") {
+            setLoading(false); setDenied(true);
+            setError("Location permission was denied. You can try again or choose manual entry.");
+            return;
+          }
+        } catch {}
+      }
       window.navigator.geolocation.getCurrentPosition(result => {
         if (current !== generation.current) return;
         setLoading(false);
@@ -26,11 +38,12 @@ export function useGeolocation() {
       }, failure => {
         if (current !== generation.current) return;
         setLoading(false);
+        setDenied(failure.code === 1);
         setError(failure.code === 1 ? "Location permission was denied. You can try again or choose manual entry." : failure.code === 3 ? "Finding your location timed out. Try again or choose manual entry." : "Your position is unavailable. Try again or choose manual entry.");
       }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     } catch {
       if (current === generation.current) { setLoading(false); setError("GPS could not be started. Try again or choose manual entry."); }
     }
   }
-  return { position, loading, error, request, clear };
+  return { position, loading, error, denied, request, clear };
 }

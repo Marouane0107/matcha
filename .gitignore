@@ -148,3 +148,7 @@ uploads/*
 backend/uploads/*
 !backend/uploads/.gitkeep
 .DS_Store
+
+# Local review evidence, not submission artifacts
+/docs/FINAL_AUDIT.md
+/docs/INTRA_FIX_STATUS.md

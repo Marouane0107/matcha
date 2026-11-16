@@ -1,3 +1,14 @@
+# Mandatory Permission-Denial Fallback
+
+The location editor now automatically requests the authenticated approximate-area
+endpoint after GPS denial when no saved location or manual draft exists. Success
+uses owner-only `approximate` mode and defaults to manual correction; failure leaves
+manual entry available. It never retries device GPS or sends an IP/coordinates in
+the request. Saved locations and in-progress manual corrections are preserved.
+Focused tests cover denial, failure, correction, late responses and public privacy.
+The root README documents local/private/proxy/IPv6 lookup limitations. The original
+GPS/manual design and test guidance below otherwise remain applicable.
+
 # Location UI Review
 
 Owner: Marouane. Branch: `feat/location-ui`. Reviewed 2026-11-02.

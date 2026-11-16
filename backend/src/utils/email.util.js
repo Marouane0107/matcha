@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export const sendVerificationEmail = async (to, token) => {
-  const verifyUrl = `${process.env.CORS_ORIGIN}/verify?token=${token}`;
+  const verifyUrl = `${process.env.CORS_ORIGIN}/verify-email#token=${token}`;
   
   const mailOptions = {
     from: `"Matcha App" <${process.env.SMTP_USER}>`,
@@ -31,7 +31,7 @@ export const sendVerificationEmail = async (to, token) => {
 };
 
 export const sendPasswordResetEmail = async (to, token) => {
-  const resetUrl = `${process.env.CORS_ORIGIN}/reset-password?token=${token}`;
+  const resetUrl = `${process.env.CORS_ORIGIN}/reset-password#token=${token}`;
   
   const mailOptions = {
     from: `"Matcha App" <${process.env.SMTP_USER}>`,
@@ -41,10 +41,14 @@ export const sendPasswordResetEmail = async (to, token) => {
       <h1>Password Reset Request</h1>
       <p>You requested a password reset. Click the link below to set a new password:</p>
       <a href="${resetUrl}">Reset Password</a>
-      <p>This link will expire in 1 hour.</p>
+      <p>This link will expire in 30 minutes.</p>
       <p>If you did not request this, please ignore this email.</p>
     `,
   };
 
   return await transporter.sendMail(mailOptions);
 };
+
+export const sendEmailChange = (to, token) => transporter.sendMail({ from: process.env.SMTP_USER, to, subject: 'Verify your new Matcha email', html: `<a href="${process.env.CORS_ORIGIN}/verify-email-change#token=${token}">Verify new email</a>` });
+
+export const sendEmailChangeCompleted = to => transporter.sendMail({ from: process.env.SMTP_USER, to, subject: 'Your Matcha email was changed', text: 'The email address for your Matcha account has been changed. All previous sessions have been signed out. Contact support immediately if you did not authorize this change.' });
