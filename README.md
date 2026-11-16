@@ -203,14 +203,3 @@ data plus the project's common-password patterns, loaded locally at startup.
 Single dictionary words with predictable numeric/punctuation wrappers are rejected;
 the dictionary is not a guarantee against all breached or weak passphrases.
 
-## Reference
-
-- [API contracts](docs/API_CONTRACT.md)
-- [Authentication strategy](docs/AUTH_STRATEGY.md)
-- [Database design](docs/DATABASE_SCHEMA.md) and executable [schema](backend/db/schema.sql)
-- [Socket events](docs/SOCKET_EVENTS.md)
-- [Git workflow](docs/GIT_WORKFLOW.md)
-- [Script safety](scripts/README.md)
-
-Frontend feature handoffs retain useful test/mocking guidance. Local audit reports
-are deliberately excluded from submission; installation does not depend on them.
