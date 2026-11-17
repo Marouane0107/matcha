@@ -85,7 +85,7 @@ app.use((_req, res) => res.status(404).json(apiError(ERROR_CODES.NOT_FOUND, 'Not
 
 // Global error-handling middleware — uses shared ApiFailure envelope
 app.use((err, req, res, next) => {
-  if (process.env.NODE_ENV !== 'test' && (err.statusCode ?? 500) >= 500) console.error('Request failed');
+  if (process.env.NODE_ENV !== 'test' && (err.statusCode ?? 500) >= 500) console.error('Request failed', err);
 
   const statusCode = err.statusCode || err.status || 500;
   const code = err.errorCode || (statusCode === 400 || statusCode === 413 ? ERROR_CODES.VALIDATION_ERROR : ERROR_CODES.INTERNAL_ERROR);

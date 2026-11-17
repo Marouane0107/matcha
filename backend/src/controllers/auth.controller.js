@@ -69,14 +69,16 @@ export const register = async (req, res, next) => {
       VALUES ($1, $2, $3, $4)
     `;
     await client.query(insertTokenQuery, [user.id, tokenHash, 'verification', expiresAt]);
-    await client.query('COMMIT');
 
-    // Send email (ignoring errors if SMTP fails during development)
+    // Send the verification email before committing so a delivery failure rolls
+    // back the whole registration instead of leaving an orphaned account behind.
     try {
       await sendVerificationEmail(email, rawToken);
     } catch (emailError) {
       throw Object.assign(new Error('Email delivery failed; request another verification email.'), { statusCode: 503 });
     }
+
+    await client.query('COMMIT');
 
     res.status(201).json(apiSuccess({
       message: 'Registration successful. Please check your email to verify your account.',
