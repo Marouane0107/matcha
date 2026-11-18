@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import type { PaginatedData, ProfileSearchResult, SearchQuery, Tag } from "@matcha/shared";
+import type { PaginatedData, ProfileSearchResult, SearchQuery, Tag, UserProfile } from "@matcha/shared";
 import { ERROR_CODES, LOCATION_CATALOG } from "@matcha/shared";
 import { useAuth } from "../features/auth/AuthProvider";
 import { ErrorNotice, Field } from "../features/auth/components/Form";
@@ -15,6 +15,19 @@ import { searchErrors, sortLabels } from "../features/discovery/validation";
 const numericFilters = { minAge: "Minimum age", maxAge: "Maximum age", maxDistance: "Maximum distance (km)", minFame: "Minimum fame", maxFame: "Maximum fame" } as const;
 type FilterKey = keyof typeof numericFilters;
 const blank = { minAge: "", maxAge: "", maxDistance: "", minFame: "", maxFame: "" };
+
+function missingRequirements(profile: UserProfile) {
+  const missing: string[] = [];
+  if (!profile.firstName.trim()) missing.push("first name");
+  if (!profile.lastName.trim()) missing.push("last name");
+  if (!profile.dateOfBirth) missing.push("date of birth");
+  if (!profile.gender) missing.push("gender");
+  if (!profile.bio.trim()) missing.push("a biography");
+  if (!profile.tags.length) missing.push("at least one interest");
+  if (!profile.pictures.some(picture => picture.isMain)) missing.push("a profile picture");
+  if (!profile.location) missing.push("a saved location");
+  return missing;
+}
 
 function ResultCard({ profile }: { profile: ProfileSearchResult }) {
   const main = profile.pictures.find(picture => picture.isMain);
@@ -44,6 +57,7 @@ export default function DiscoveryPage({ mode }: { mode: "suggestions" | "search"
   const [attempt, setAttempt] = useState(0);
   const [tagAttempt, setTagAttempt] = useState(0);
   const [state, setState] = useState<{ token: string | null; data: PaginatedData<ProfileSearchResult> | null; loading: boolean; error: unknown }>({ token: null, data: null, loading: true, error: null });
+  const [ownerProfile, setOwnerProfile] = useState<UserProfile | null>(null);
   useEffect(() => {
     let active = true;
     setTags(null); setTagError(null);
@@ -67,7 +81,16 @@ export default function DiscoveryPage({ mode }: { mode: "suggestions" | "search"
     if (!Object.keys(invalid).length) setQuery(next);
   }
   const data = state.token === accessToken ? state.data : null;
-  const eligibility = state.error instanceof ApiRequestError && (state.error.error.code === ERROR_CODES.PROFILE_INCOMPLETE || state.error.error.code === ERROR_CODES.LOCATION_REQUIRED);
+  const eligibilityCode = state.error instanceof ApiRequestError && (state.error.error.code === ERROR_CODES.PROFILE_INCOMPLETE || state.error.error.code === ERROR_CODES.LOCATION_REQUIRED) ? state.error.error.code : null;
+  const eligibility = eligibilityCode !== null;
+  useEffect(() => {
+    if (!eligibility || !accessToken) return;
+    let active = true;
+    setOwnerProfile(null);
+    void profiles.me(accessToken).then(profile => { if (active) setOwnerProfile(profile); }, () => { if (active) setOwnerProfile(null); });
+    return () => { active = false; };
+  }, [eligibility, accessToken, profiles]);
+  const missing = ownerProfile ? missingRequirements(ownerProfile) : null;
   return <>
     <div className="page-toolbar"><div><p className="eyebrow">People nearby</p><h1 tabIndex={-1}>{mode === "suggestions" ? "Browse" : "Advanced search"}</h1></div></div>
     <form onSubmit={submit} noValidate className="discovery-filters" aria-label="Profile filters">
@@ -80,7 +103,7 @@ export default function DiscoveryPage({ mode }: { mode: "suggestions" | "search"
       <div className="action-row"><button className="primary compact" type="submit">{mode === "search" ? "Search" : "Apply filters"}</button><button className="secondary" type="button" onClick={() => { setDraft(blank); setSelected([]); setSortBy(undefined); setSortOrder("asc"); setLocation(""); setErrors({}); setQuery({ page: 1, limit: 12 }); }}>Reset</button></div>
     </form>
     <section aria-label="Profile results" aria-busy={state.loading} className="discovery-results">
-      {state.loading || state.token !== accessToken ? <p role="status">Loading profiles...</p> : state.error ? <div className="profile-empty">{eligibility ? <><h2>Complete your profile to discover people</h2><p>A saved location and complete profile are required.</p><div className="action-row"><Link to="/profile">Review profile</Link><Link to="/profile/location">Update location</Link></div></> : <><ErrorNotice error={state.error} /></>}<button className="secondary" onClick={() => setAttempt(value => value + 1)}>Try again</button></div> : data && <>
+      {state.loading || state.token !== accessToken ? <p role="status">Loading profiles...</p> : state.error ? <div className="profile-empty">{eligibility ? <>{eligibilityCode === ERROR_CODES.LOCATION_REQUIRED ? <><h2>Add your location to discover people</h2><p>A saved location is required to find people nearby.</p></> : <><h2>Complete your profile to discover people</h2><p>You're almost ready to discover people.</p></>}{missing === null ? <p className="muted">Checking your profile…</p> : missing.length ? <p className="muted">Still needed: {missing.join(", ")}.</p> : <p className="muted">Everything looks complete — try again.</p>}<div className="action-row"><Link className="primary compact" to={eligibilityCode === ERROR_CODES.LOCATION_REQUIRED ? "/profile/location" : "/profile/edit"}>{eligibilityCode === ERROR_CODES.LOCATION_REQUIRED ? "Add your location" : "Complete your profile"}</Link><Link className="secondary" to="/profile">Review profile</Link></div></> : <><ErrorNotice error={state.error} /></>}<button className="secondary" onClick={() => setAttempt(value => value + 1)}>Try again</button></div> : data && <>
         <p role="status">{data.pagination.total} {data.pagination.total === 1 ? "profile" : "profiles"} found</p>
         {!data.items.length ? <div className="profile-empty"><h2>No profiles found</h2><p>Try widening your criteria.</p></div> : <div className="discovery-grid">{data.items.map(profile => <ResultCard key={profile.id} profile={profile} />)}</div>}
         <nav className="discovery-pagination" aria-label="Result pages"><button className="secondary" disabled={data.pagination.page <= 1} onClick={() => setQuery(current => ({ ...current, page: data.pagination.page - 1 }))}>Previous</button><span>Page {data.pagination.page} of {Math.max(1, data.pagination.totalPages)}</span><button className="secondary" disabled={data.pagination.page >= data.pagination.totalPages} onClick={() => setQuery(current => ({ ...current, page: data.pagination.page + 1 }))}>Next</button></nav>
