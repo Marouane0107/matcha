@@ -7,7 +7,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { Field, ErrorNotice } from "../auth/components/Form";
 import { ApiRequestError } from "../../services/api/client";
 import { useProfileService } from "../profile/ProfileProvider";
-import { useGeolocation } from "./useGeolocation";
+import { MAX_LOCATION_ACCURACY, useGeolocation } from "./useGeolocation";
 import { locationErrors } from "./validation";
 
 export default function LocationSelector({ profile, onSaved }: { profile: UserProfile; onSaved: () => void }) {
@@ -70,7 +70,7 @@ export default function LocationSelector({ profile, onSaved }: { profile: UserPr
             {consent && !gps.position && <div className="notice"><p>With your permission, Matcha will request your position once to find nearby people. It is not saved until you confirm. You can use manual entry instead.</p><button type="button" className="primary compact" disabled={gps.loading} onClick={gps.request}>{gps.loading ? "Finding your location..." : "Allow location request"}</button></div>}
             {gps.loading && <p role="status">Finding your location...</p>}
             {gps.error && <p role="alert" className="notice error">{gps.error}</p>}
-            {gps.position && <div className="notice success"><p role="status">Position ready. Estimated accuracy: {Math.ceil(gps.position.accuracy)} metres. Confirm your city and neighborhood before saving.</p><button type="button" className="text-button" onClick={gps.request}>Locate again</button></div>}
+            {gps.position && <div className={`notice ${gps.position.accuracy > MAX_LOCATION_ACCURACY ? "warning" : "success"}`}><p role="status">Position ready. Estimated accuracy: {gps.position.accuracy >= 1000 ? `${Math.round(gps.position.accuracy / 1000)} km` : `${Math.ceil(gps.position.accuracy)} metres`}. {gps.position.accuracy > MAX_LOCATION_ACCURACY ? "This is approximate — confirm your city below before saving." : "Confirm your city and neighborhood before saving."}</p><button type="button" className="text-button" onClick={gps.request}>Locate again</button></div>}
           </>}
           <Field label="City" name="city" autoComplete="address-level2" value={city} onChange={event => setCity(event.target.value)} error={errors.city} hint={mode === "gps" ? "Browser GPS does not supply place names. Confirm the city for your profile." : "Include region or country if your city name is ambiguous."} />
           <Field label="Neighborhood (optional)" name="neighborhood" autoComplete="address-level3" value={neighborhood} onChange={event => setNeighborhood(event.target.value)} error={errors.neighborhood} />

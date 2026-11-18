@@ -19,8 +19,8 @@ export function useGeolocation() {
         if (current !== generation.current) return;
         setLoading(false);
         const { latitude, longitude, accuracy } = result.coords;
-        if (!Number.isFinite(latitude) || Math.abs(latitude) > 90 || !Number.isFinite(longitude) || Math.abs(longitude) > 180 || !Number.isFinite(accuracy) || accuracy < 0 || accuracy > MAX_LOCATION_ACCURACY) {
-          setError("Your position is not accurate enough for a neighborhood. Try again near a window or enter your location manually."); return;
+        if (!Number.isFinite(latitude) || Math.abs(latitude) > 90 || !Number.isFinite(longitude) || Math.abs(longitude) > 180 || !Number.isFinite(accuracy) || accuracy < 0) {
+          setError("Your position could not be read. Try again or enter your location manually."); return;
         }
         setPosition({ latitude, longitude, accuracy });
       }, failure => {

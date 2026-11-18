@@ -90,12 +90,13 @@ test("unsupported and insecure contexts offer manual entry without GPS calls", a
   assert.equal(requests.length, 0);
 });
 
-test("poor accuracy is rejected and switching modes ignores stale GPS results", async context => {
+test("coarse accuracy is accepted with a warning and switching modes ignores stale GPS results", async context => {
   const { requests } = await mount(context);
   await startGPS();
   await act(async () => requests[0].success(position(4000)));
-  assert(text().includes("not accurate enough"));
-  await click(button("Allow location request"));
+  assert(text().includes("Position ready"));
+  assert(text().includes("approximate"));
+  await click(button("Locate again"));
   await click(document.querySelectorAll('input[name="location-method"]')[1]);
   await act(async () => requests[1].success(position()));
   assert(!text().includes("Position ready"));
