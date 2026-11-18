@@ -21,7 +21,7 @@ export function isAuthUser(value: unknown): value is AuthUser {
 export function isAuthResponse(value: unknown): value is AuthResponse {
   return isRecord(value) && isAuthUser(value.user) && value.user.emailVerified &&
     typeof value.accessToken === "string" && value.accessToken.length > 0 && value.tokenType === "Bearer" &&
-    typeof value.expiresIn === "number" && Number.isInteger(value.expiresIn) && value.expiresIn > 0 && value.expiresIn <= 900;
+    typeof value.expiresIn === "number" && Number.isInteger(value.expiresIn) && value.expiresIn > 0 && value.expiresIn <= 30 * 86400;
 }
 
 const isAcknowledgement = (value: unknown): value is Acknowledgement => isRecord(value) && typeof value.message === "string";
