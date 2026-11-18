@@ -13,10 +13,42 @@ export function canAccessProfile(state: AuthState): boolean {
   return state.status === "authenticated" && state.user !== null && state.accessToken !== null;
 }
 
+const STORAGE_KEY = "matcha.session";
+
+interface StoredSession {
+  user: AuthUser;
+  accessToken: string;
+  expiresAt: number;
+}
+
+function loadStoredSession(): StoredSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<StoredSession>;
+    const user = value?.user as AuthUser | undefined;
+    if (value && typeof value.accessToken === "string" && value.accessToken.length > 0 && user && typeof user.id === "string" && typeof user.username === "string" && typeof value.expiresAt === "number" && value.expiresAt > Date.now()) {
+      return { user, accessToken: value.accessToken, expiresAt: value.expiresAt };
+    }
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch { /* malformed or unavailable storage */ }
+  return null;
+}
+
+function persistSession(value: StoredSession | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (value) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    else window.localStorage.removeItem(STORAGE_KEY);
+  } catch { /* storage may be unavailable */ }
+}
+
 export function createAuthSession(service: AuthService) {
-  let state: AuthState = { status: "unauthenticated", user: null, accessToken: null };
+  const stored = loadStoredSession();
+  let state: AuthState = stored ? { status: "authenticated", user: stored.user, accessToken: stored.accessToken } : { status: "unauthenticated", user: null, accessToken: null };
   let generation = 0;
-  let expiresAt = 0;
+  let expiresAt = stored?.expiresAt ?? 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const listeners = new Set<() => void>();
   function publish(next: AuthState) { state = next; listeners.forEach(listener => listener()); }
@@ -24,15 +56,18 @@ export function createAuthSession(service: AuthService) {
     generation++;
     clearTimeout(timer);
     expiresAt = 0;
+    persistSession(null);
     publish({ status: "unauthenticated", user: null, accessToken: null });
   }
   function setSession(response: AuthResponse) {
     generation++;
     clearTimeout(timer);
     expiresAt = Date.now() + response.expiresIn * 1000;
+    persistSession({ user: response.user, accessToken: response.accessToken, expiresAt });
     publish({ status: "authenticated", user: response.user, accessToken: response.accessToken });
     timer = setTimeout(clearSession, response.expiresIn * 1000);
   }
+  if (stored) timer = setTimeout(clearSession, Math.max(0, stored.expiresAt - Date.now()));
   function expireIfNeeded() {
     if (expiresAt && Date.now() >= expiresAt) clearSession();
   }

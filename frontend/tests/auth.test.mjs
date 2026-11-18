@@ -58,7 +58,7 @@ test("network, malformed data and API errors stay distinct", async () => {
 const credentials = { username: "demo", password: "DemoPassword123" };
 const registration = { ...credentials, username: "new_user", email: "new@example.invalid", firstName: "Test", lastName: "Person" };
 
-test("mock login/me/logout share real contracts and sessions are memory-only", async () => {
+test("mock login/me/logout share real contracts and clear state on logout", async () => {
   const service = createMockAuthService(0);
   const session = createAuthSession(service);
   try {
@@ -67,10 +67,33 @@ test("mock login/me/logout share real contracts and sessions are memory-only", a
     assert.equal(canAccessProfile(session.getSnapshot()), true);
     await session.refreshUser();
     assert.equal(session.getSnapshot().user.username, "demo");
-    assert.equal(createAuthSession(service).getSnapshot().accessToken, null);
     assert.equal(await session.logout(), true);
     assert.deepEqual(session.getSnapshot(), { status: "unauthenticated", user: null, accessToken: null });
   } finally { session.clearSession(); }
+});
+
+test("session persists and restores the token across instances via localStorage", async () => {
+  const store = new Map();
+  const storage = {
+    getItem: key => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: key => store.delete(key),
+  };
+  const previous = globalThis.window;
+  globalThis.window = { localStorage: storage };
+  const service = createMockAuthService(0);
+  try {
+    const first = createAuthSession(service);
+    await first.login(credentials);
+    const second = createAuthSession(service);
+    assert.equal(second.getSnapshot().status, "authenticated");
+    assert.equal(second.getSnapshot().accessToken, first.getSnapshot().accessToken);
+    assert.equal(second.getSnapshot().user.username, "demo");
+    second.clearSession();
+    assert.equal(createAuthSession(service).getSnapshot().accessToken, null);
+  } finally {
+    if (previous === undefined) delete globalThis.window; else globalThis.window = previous;
+  }
 });
 
 test("logout clears locally even when server revocation fails", async () => {
