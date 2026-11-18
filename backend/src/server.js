@@ -20,8 +20,8 @@ import { validateJwtSecret } from './utils/jwt.util.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from the repo root .env (not the backend workspace)
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 validateJwtSecret();
 
 export const app = express();

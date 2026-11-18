@@ -18,19 +18,19 @@ commands from the repository root:
 
 ```sh
 npm ci
+cp .env.example .env
 cp frontend/.env.example frontend/.env
-cp backend/.env.example backend/.env
 npm run build --workspace=@matcha/shared
 ```
 
 Do not overwrite existing local environment files. Install dependencies only at
 the root using the single committed lockfile.
 
-Configure backend `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`,
-`DB_NAME=matcha_dev`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and
-`CORS_ORIGIN`. Generate `JWT_SECRET` locally with at least 32 random bytes (for
-example `openssl rand -hex 32`); keep it private. Set `JWT_EXPIRES_IN=15m`.
-The backend uses `dotenv` in its workspace. No root environment file is needed.
+Configure the backend in the root `.env`: `DB_HOST`, `DB_PORT`, `DB_USER`,
+`DB_PASSWORD`, `DB_NAME=matcha_dev`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+`SMTP_PASSWORD` and `CORS_ORIGIN`. Generate `JWT_SECRET` locally with at least 32
+random bytes (for example `openssl rand -hex 32`); keep it private. Set
+`JWT_EXPIRES_IN=15m`. The backend loads the repo root `.env` via `dotenv`.
 
 Configure `frontend/.env` with `VITE_API_URL=http://localhost:3000/api` and
 `VITE_SOCKET_URL=http://localhost:3000`. Leave every `VITE_*_MOCK` flag `false`.

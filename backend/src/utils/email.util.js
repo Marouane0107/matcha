@@ -1,6 +1,10 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 // Values shipped in .env / .env.example as placeholders — treat them as "not configured".
 const SMTP_PLACEHOLDERS = new Set(['smtp.example.com', 'your_smtp_user', 'your_smtp_password']);
