@@ -12,10 +12,10 @@ export const validateJwtSecret = () => {
   return secret;
 };
 
-const DEFAULT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+const DEFAULT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 
 export const generateToken = (payload, expiresIn = DEFAULT_EXPIRES_IN) => {
-  return jwt.sign({ sub: payload.id, ver: payload.version }, validateJwtSecret(), { expiresIn: Math.min(900, getExpiresInSeconds(expiresIn)), algorithm: 'HS256', issuer: 'matcha-api', audience: 'matcha-web' });
+  return jwt.sign({ sub: payload.id, ver: payload.version }, validateJwtSecret(), { expiresIn: getExpiresInSeconds(expiresIn), algorithm: 'HS256', issuer: 'matcha-api', audience: 'matcha-web' });
 };
 
 export const verifyToken = (token) => {
@@ -26,20 +26,23 @@ export const verifyToken = (token) => {
 
 /**
  * Returns the token expiry duration as seconds (number).
- * Parses the JWT_EXPIRES_IN env var (e.g. "7d", "24h", "3600").
+ * Parses the JWT_EXPIRES_IN env var (e.g. "15m", "8h", "7d", "3600").
+ * Clamped to a sane range of 1 second .. 30 days.
  */
 export const getExpiresInSeconds = (raw = DEFAULT_EXPIRES_IN) => {
   const match = raw.match(/^(\d+)([smhd]?)$/);
-  if (!match) return 900;
+  if (!match) return 8 * 3600;
 
   const value = parseInt(match[1], 10);
   const unit = match[2] || 's';
 
+  let seconds;
   switch (unit) {
-    case 's': return Math.max(1, Math.min(900, value));
-    case 'm': return Math.max(1, Math.min(900, value * 60));
-    case 'h': return Math.max(1, Math.min(900, value * 3600));
-    case 'd': return Math.max(1, Math.min(900, value * 86400));
-    default: return 900;
+    case 's': seconds = value; break;
+    case 'm': seconds = value * 60; break;
+    case 'h': seconds = value * 3600; break;
+    case 'd': seconds = value * 86400; break;
+    default: return 8 * 3600;
   }
+  return Math.max(1, Math.min(seconds, 30 * 86400));
 };

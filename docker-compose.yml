@@ -37,7 +37,7 @@ services:
       DB_NAME: matcha_dev
       DB_CONFIRM_NAME: matcha_dev
       JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
-      JWT_EXPIRES_IN: 15m
+      JWT_EXPIRES_IN: 8h
       SMTP_HOST: smtp.example.com
       SMTP_PORT: "587"
       SMTP_USER: your_smtp_user
