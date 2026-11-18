@@ -29,19 +29,18 @@ export const server = http.createServer(app);
 
 // Environment variables configuration
 const PORT = process.env.PORT || 3000;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
 // Socket.io configuration
 export const io = new Server(server, {
   maxHttpBufferSize: 16384,
   cors: {
-    origin: CORS_ORIGIN,
+    origin: '*',
     methods: ['GET', 'POST']
   }
 });
 
 // Middleware
-app.use(cors({ origin: CORS_ORIGIN }));
+app.use(cors({ origin: '*' }));
 app.use(bodyParser.json({ limit: '32kb' }));
 app.use(rateLimit);
 
